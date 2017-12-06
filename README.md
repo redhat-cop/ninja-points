@@ -11,7 +11,7 @@ For contributions to GitHub, we use search filters to find people's contribution
 For example, to find all eligible bugfix pull requests:
 
 ```
-is:merged is:pr archived:false user:redhat-cop label:bug author:etsauer updated:>=2017-03-01
+is:merged is:pr archived:false user:redhat-cop author:etsauer updated:>=2017-03-01
 ```
 
 ### Enhancement Pull Request
@@ -29,7 +29,7 @@ is:merged is:pr archived:false user:redhat-cop reviewed-by:etsauer updated:>=201
 ### Closed Issues
 
 ```
-is:merged is:pr archived:false user:redhat-cop assignee:etsauer updated:>=2017-03-01
+is:closed is:issue archived:false user:redhat-cop assignee:etsauer updated:>=2017-03-01
 ```
 
 ## Trello
