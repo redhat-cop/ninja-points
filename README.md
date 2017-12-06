@@ -4,7 +4,7 @@ This repo helps us calculate point values from contributions to our github and t
 
 ## GitHub contributions
 
-For contributions to GitHub, we use search filters to find people's contributions. You can run these from link:https://github.com/pulls[github.com/pulls]
+For contributions to GitHub, we use search filters to find people's contributions. You can run these from [github.com/pulls](https://github.com/pulls)
 
 ### Bugfix Pull Request
 
