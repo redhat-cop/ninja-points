@@ -34,6 +34,12 @@ is:closed is:issue archived:false user:redhat-cop assignee:etsauer updated:>=201
 
 ## Trello
 
+### Cards Completed By Member worth 2 points
+
+```
+list:Done member:andrewblock edited:365 name:"\(2\)"
+```
+
 Still figuring it out, but this might help some.
 
 http://help.trello.com/article/808-searching-for-cards-all-boards
