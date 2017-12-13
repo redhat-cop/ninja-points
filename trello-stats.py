@@ -29,6 +29,12 @@ def get_member(session, member_id):
 
     return member_request.json()
 
+def encode_text(text):
+    if text:
+        return text.encode("utf-8")
+
+    return text
+
 if not TRELLO_API_KEY or not TRELLO_API_TOKEN:
     print "Error: Trello API Key and Token are Required!"
     sys.exit(1)
@@ -71,9 +77,9 @@ for card in resp_cards['cards']:
 
             members_cards[member_id] = member_cards
 
-print "=== Statistics for Trello Team '{0}' ====\n".format(org_response['displayName'] if 'displayName' in org_response else org_response['name'])
+print "=== Statistics for Trello Team '{0}' ====\n".format(encode_text(org_response['displayName']) if 'displayName' in org_response else encode_text(org_response['name']))
 for key, value in members_cards.iteritems():
         member = get_member(session, key)
-        print "{0} has {1} cards".format(member['username'], len(value))
+        print "{0} has {1} cards".format(encode_text(member['username']), len(value))
         for card in value:
-            print "   - Board: {0} | Card: {1}".format(cards[card]['board']['name'], cards[card]['name'])
+            print "   - Board: {0} | Card: {1}".format(encode_text(cards[card]['board']['name']), encode_text(cards[card]['name']))
