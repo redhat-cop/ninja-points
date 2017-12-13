@@ -18,7 +18,7 @@ def get_org_id(session):
     return org_request.json()
 
 def search_cards(session, org_id):
-    card_request = session.get("https://api.trello.com/1/search", params={'query': TRELLO_SEARCH_QUERY, 'idOrganizations': org_id, 'card_fields': 'name,idMembers', 'board_fields': 'name,idOrganization', 'card_board': 'true'})
+    card_request = session.get("https://api.trello.com/1/search", params={'query': TRELLO_SEARCH_QUERY, 'idOrganizations': org_id, 'card_fields': 'name,idMembers', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
     card_request.raise_for_status()
 
     return card_request.json()
