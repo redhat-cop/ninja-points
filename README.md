@@ -45,14 +45,6 @@ Then configure the following variable:
 GITHUB_API_TOKEN='<API_KEY>'
 ```
 
-## Trello
-
-### Cards Completed By Member worth 2 points
-
-```
-list:Done member:andrewblock edited:365 name:"\(2\)"
-```
-
 Execute the script:
 
 ```
@@ -64,6 +56,14 @@ $ ./github-stats.py
 
 csmith - 1
    ninja-points - Enhancement to GitHub script
+```
+
+## Trello
+
+### Cards Completed By Member worth 2 points
+
+```
+list:Done member:andrewblock edited:365 name:"\(2\)"
 ```
 
 ### Script
