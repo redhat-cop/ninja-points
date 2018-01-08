@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
-import json, requests, sys
+import json, requests, sys, argparse
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 # Fill in GitHub Token
 GITHUB_API_TOKEN = ''
 
-# Search for cards that are done and have been modified in the past 30 days
 GITHUB_ORG = 'redhat-cop'
 USER_AGENT= 'redhat-cop-stats'
-SEARCH_DAYS=30
 ENHANCEMENT_LABEL = 'enhancement'
+DEFAULT_START_DATE_MONTH = '03'
+DEFAULT_START_DATE_DAY = '01'
 
 def handle_pagination_items(session, url):
     
@@ -22,9 +23,25 @@ def handle_pagination_items(session, url):
     else:
         return pagination_request.json()['items']
 
+def generate_start_date():
+    today_date = datetime.now()
+    target_start_date = datetime.strptime("{0}-{1}-{02}".format(today_date.year, DEFAULT_START_DATE_MONTH, DEFAULT_START_DATE_DAY), "%Y-%m-%d")
+
+    if target_start_date.month < DEFAULT_START_DATE_MONTH:
+        target_start_date = target_start_date - relativedelta(years=1)
+
+    return target_start_date
+
+def valid_date(s):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except ValueError:
+        msg = "Not a valid date: '{0}'.".format(s)
+        raise argparse.ArgumentTypeError(msg)
+
 def encode_text(text):
     if text:
-        return text.C("utf-8")
+        return text.encode("utf-8")
 
     return text
 
@@ -48,11 +65,9 @@ def get_reviews(session, url):
 
     return pr_request.json()
 
-def get_org_search_issues(session):
+def get_org_search_issues(session, start_date):
     
-    lower_search_date = datetime.now() - timedelta(days=SEARCH_DAYS)
-
-    query = "https://api.github.com/search/issues?q=user:redhat-cop+updated:>={}+archived:false+state:closed".format(lower_search_date.date().isoformat())
+    query = "https://api.github.com/search/issues?q=user:redhat-cop+updated:>={}+archived:false+state:closed".format(start_date.date().isoformat())
     return handle_pagination_items(session, query)
 
 def has_label(issue, label_name):
@@ -73,6 +88,17 @@ session.headers = {
 
 }
 
+
+
+parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
+parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
+args = parser.parse_args()
+
+start_date = args.start_date
+
+if start_date is None:
+    start_date = generate_start_date()
+
 # Initialize Collection Statistics
 enhancement_prs = {}
 bugfix_prs = {}
@@ -83,7 +109,7 @@ if not GITHUB_API_TOKEN:
     print "Error: GitHub API Key is Required!"
     sys.exit(1)    
 
-org_search_issues = get_org_search_issues(session)
+org_search_issues = get_org_search_issues(session, start_date)
 
 for issue in org_search_issues:
 
@@ -161,23 +187,23 @@ print "\n== Enhancement PR's ==\n"
 for key, value in enhancement_prs.iteritems():
     print "{0} - {1}".format(value[0]['user']['login'], len(value))
     for issue_value in value:
-        print "   {0} - {1}".format(issue_value['repository_url'].split('/')[-1], issue_value['title'])
+        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Bugfix PR's ==\n"
 for key, value in bugfix_prs.iteritems():
     print "{0} - {1}".format(value[0]['user']['login'], len(value))
     for issue_value in value:
-        print "   {0} - {1}".format(issue_value['repository_url'].split('/')[-1], issue_value['title'])
+        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():
     print "{0} - {1}".format(value.itervalues().next()['user']['login'], len(value))
     for issue_key, issue_value in value.iteritems():
-        print "   {0} - {1}".format(issue_value['repository_url'].split('/')[-1], issue_value['title'])
+        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Closed Issues ==\n"
 
 for key, value in closed_issues.iteritems():
     print "{0} - {1}".format(value[0]['assignee']['login'], len(value))
     for issue_value in value:
-        print "   {0} - {1}".format(issue_value['repository_url'].split('/')[-1], issue_value['title'])
+        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
