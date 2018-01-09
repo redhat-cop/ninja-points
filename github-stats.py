@@ -197,7 +197,7 @@ for key, value in bugfix_prs.iteritems():
 
 print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():
-    print "{0} - {1}".format(value.itervalues().next()['user']['login'], len(value))
+    print "{0} - {1}".format(key, len(value))
     for issue_key, issue_value in value.iteritems():
         print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
