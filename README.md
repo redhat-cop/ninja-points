@@ -39,10 +39,10 @@ A script called [github-stats.py](tgithub-stats.py) is available to automate the
 
 To be able to query the GitHub API, create a new [Personal Access Token](https://github.com/settings/tokens). Configure a key with at least read access.
 
-Then configure the following variable:
+Then configure the `GITHUB_API_TOKEN` environment variable as follows:
 
 ```
-GITHUB_API_TOKEN='<API_KEY>'
+export GITHUB_API_TOKEN='<API_KEY>'
 ```
 
 Execute the script:

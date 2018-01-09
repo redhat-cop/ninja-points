@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
-import json, requests, sys, argparse
+import os, json, requests, sys, argparse
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 # Fill in GitHub Token
-GITHUB_API_TOKEN = ''
-
+GITHUB_API_TOKEN_NAME = 'GITHUB_API_TOKEN'
 GITHUB_ORG = 'redhat-cop'
 USER_AGENT= 'redhat-cop-stats'
 ENHANCEMENT_LABEL = 'enhancement'
@@ -80,15 +79,6 @@ def has_label(issue, label_name):
     
     return False
 
-session = requests.Session()
-session.headers = {
-    'Accept': 'application/vnd.github.v3+json',
-    'Authorization': 'Token {0}'.format(GITHUB_API_TOKEN),
-    'User-Agent': USER_AGENT
-
-}
-
-
 
 parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
@@ -99,15 +89,25 @@ start_date = args.start_date
 if start_date is None:
     start_date = generate_start_date()
 
+
+github_api_token = os.environ.get(GITHUB_API_TOKEN_NAME)
+
+if not github_api_token:
+    print "Error: GitHub API Key is Required!"
+    sys.exit(1)
+
+session = requests.Session()
+session.headers = {
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': 'Token {0}'.format(github_api_token),
+    'User-Agent': USER_AGENT
+}
+
 # Initialize Collection Statistics
 enhancement_prs = {}
 bugfix_prs = {}
 closed_issues = {}
 reviewed_prs = {}
-
-if not GITHUB_API_TOKEN:
-    print "Error: GitHub API Key is Required!"
-    sys.exit(1)    
 
 org_search_issues = get_org_search_issues(session, start_date)
 
