@@ -32,6 +32,35 @@ is:merged is:pr archived:false user:redhat-cop reviewed-by:etsauer updated:>=201
 is:closed is:issue archived:false user:redhat-cop assignee:etsauer updated:>=2017-03-01
 ```
 
+
+### Script
+
+A script called [github-stats.py](tgithub-stats.py) is available to automate the aggregation of statistics from the [redhat-cop GitHub organization](https://github.com/redhat-cop).
+
+To be able to query the GitHub API, create a new [Personal Access Token](https://github.com/settings/tokens). Configure a key with at least read access.
+
+Then configure the `GITHUB_API_TOKEN` environment variable as follows:
+
+```
+export GITHUB_API_TOKEN='<API_KEY>'
+```
+
+Execute the script:
+
+```
+$ ./github-stats.py
+
+=== Statistics for GitHub Organization 'redhat-cop' ====
+
+== Enhancement PR's ==
+
+csmith - 1
+   ninja-points - Enhancement to GitHub script
+```
+
+By default, the script uses a search range from March 1 of a calendar year to the present. To specify an alternate date, use the `--start-date` argument such as `--start-date=2017-09-01`.
+
+
 ## Trello
 
 ### Cards Completed By Member worth 2 points
