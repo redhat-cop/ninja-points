@@ -11,7 +11,7 @@ DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
 
 # Search for cards that are done and have been modified in the past 30 days
-TRELLO_SEARCH_QUERY = 'list:Done edited:{0}'
+TRELLO_SEARCH_QUERY = 'list:Done edited:{0} {1}'
 
 def valid_date(s):
     try:
@@ -36,7 +36,11 @@ def get_org_id(session):
 
     return org_request.json()
 
-def search_cards(session, org_id, query):
+def search_cards(session, org_id, days, author):
+    
+    author = "@{0}".format(author) if author is not None else ""
+
+    query = TRELLO_SEARCH_QUERY.format(days, author)
     print query
     card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idMembers', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
     card_request.raise_for_status()
@@ -66,9 +70,11 @@ if not trello_api_key or not trello_api_token:
 
 parser = argparse.ArgumentParser(description='Gather Trello Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
+parser.add_argument("-u","--username", help="Username to query")
 args = parser.parse_args()
 
 start_date = args.start_date
+username = args.username
 
 if start_date is None:
     start_date = generate_start_date()
@@ -84,7 +90,7 @@ session.params = {
 org_response = get_org_id(session)
 org_id = org_response['id']
 
-resp_cards = search_cards(session, org_id, TRELLO_SEARCH_QUERY.format(days))
+resp_cards = search_cards(session, org_id, days, username)
 
 cards = {}
 members_cards = {}
@@ -114,6 +120,10 @@ for card in resp_cards['cards']:
 print "=== Statistics for Trello Team '{0}' ====\n".format(encode_text(org_response['displayName']) if 'displayName' in org_response else encode_text(org_response['name']))
 for key, value in members_cards.iteritems():
         member = get_member(session, key)
+
+        if username is not None and member['username'] != username:
+            continue
+
         print "{0} has {1} cards".format(encode_text(member['username']), len(value))
         for card in value:
             print "   - Board: {0} | Card: {1}".format(encode_text(cards[card]['board']['name']), encode_text(cards[card]['name']))

@@ -82,9 +82,11 @@ def has_label(issue, label_name):
 
 parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
+parser.add_argument("-u","--username", help="Username to query")
 args = parser.parse_args()
 
 start_date = args.start_date
+username = args.username
 
 if start_date is None:
     start_date = generate_start_date()
@@ -114,6 +116,7 @@ org_search_issues = get_org_search_issues(session, start_date)
 for issue in org_search_issues:
 
     issue_author_id = issue['user']['id']
+    issue_author_login = issue['user']['login']
 
     # Check if Issue is a Pull Request
     if 'pull_request' in issue:
@@ -133,6 +136,10 @@ for issue in org_search_issues:
         for review in pr_reviews:
             review_author_login = review['user']['login']
 
+            #Filter out unwanted review users
+            if username is not None and review_author_login != username:
+                continue
+
             if review_author_login not in reviewed_prs:
                 review_author_prs = {}
             else:
@@ -142,6 +149,10 @@ for issue in org_search_issues:
                 review_author_prs[issue['id']] = issue
             
             reviewed_prs[review_author_login] = review_author_prs
+
+        #Filter out unwanted pr users
+        if username is not None and issue_author_login != username:
+            continue
 
         # Scroll Through Labels
         # If Enhancement, Add to Bucket
@@ -165,9 +176,15 @@ for issue in org_search_issues:
         bugfix_author_prs.append(issue)
         bugfix_prs[issue_author_id] = bugfix_author_prs
     else:
+
         if issue['state'] == 'closed' and issue['assignee'] is not None:
 
             closed_issue_author_id = issue['assignee']['id']
+            closed_issue_author_login = issue['assignee']['login']
+
+            #Filter out unwanted assignees
+            if username is not None and closed_issue_author_login != username:
+                continue
 
             # Ignore Self Assigned Issues
             if issue_author_id == closed_issue_author_id:
