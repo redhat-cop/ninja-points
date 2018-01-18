@@ -68,12 +68,12 @@ def get_reviews(session, url):
     return pr_request.json()
 
 def get_org_search_issues(session, start_date, labels):
-    
+
     query = "https://api.github.com/search/issues?q=user:redhat-cop+updated:>={}+archived:false+state:closed{}".format(start_date.date().isoformat(), labels)
     return handle_pagination_items(session, query)
 
 def process_labels(labels):
-    output_labels = "";
+    output_labels = " ";
 
     for label in labels:
 
@@ -81,7 +81,7 @@ def process_labels(labels):
             output_labels += "-"
             label = label[0:-1]
 
-        output_labels += " label:{0}".format(label)
+        output_labels += "label:{0} ".format(label)
 
     return output_labels
 
