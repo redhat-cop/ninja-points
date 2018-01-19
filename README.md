@@ -54,8 +54,9 @@ $ ./github-stats.py
 
 == General PR's ==
 
-csmith - 1
-   ninja-points - Enhancement to GitHub script
+enhancement:
+  csmith - 1
+    ninja-points - Enhancement to GitHub script
 ```
 
 By default, the script uses a search range from March 1 of a calendar year to the present. To specify an alternate date, use the `--start-date` argument such as `--start-date=2017-09-01`.
