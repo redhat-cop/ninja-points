@@ -10,7 +10,7 @@ GITHUB_ORG = 'redhat-cop'
 USER_AGENT= 'redhat-cop-stats'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
-DEFAULT_LABEL_LIST = ['enhancement']
+UNLABELED = 'unlabeled'
 
 def handle_pagination_items(session, url):
     
@@ -38,9 +38,6 @@ def valid_date(s):
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
 
-def string_to_list(s):
-    return [x.strip() for x in s.split(',')]
-
 def encode_text(text):
     if text:
         return text.encode("utf-8")
@@ -67,34 +64,65 @@ def get_reviews(session, url):
 
     return pr_request.json()
 
-def get_org_search_issues(session, start_date, labels):
+def get_org_search_issues(session, start_date):
 
-    query = "https://api.github.com/search/issues?q=user:redhat-cop+updated:>={}+archived:false+state:closed{}".format(start_date.date().isoformat(), labels)
+    query = "https://api.github.com/search/issues?q=user:redhat-cop+updated:>={}+archived:false+state:closed".format(start_date.date().isoformat())
     return handle_pagination_items(session, query)
 
 def process_labels(labels):
-    output_labels = " ";
+    label_dict = {}
 
-    for label in labels:
+    if labels:
+        for x in labels.split(','):
+            label_dict[x.strip()] = None
 
-        if label[-1] == "-":
-            output_labels += "-"
-            label = label[0:-1]
+    return label_dict
 
-        output_labels += "label:{0} ".format(label)
+def process_general_issues(issue, all_prs, label_prs):
+    
+    author_login = issue['user']['login']
 
-    return output_labels
+    if author_login not in label_prs:
+            all_author_prs = []
+    else:
+        all_author_prs = label_prs[author_login]
 
+    all_author_prs.append(issue)
+    label_prs[author_login] = all_author_prs
+
+    return label_prs
+
+def show_label(label_items_key, input_labels):
+    
+    # Check if length of input labels is 0. If so, show all labels
+    if len(input_labels) == 0:
+        return True
+
+    # Loop through input labels
+    for key in input_labels:
+
+        # Check if label should be omitted
+        if key[-1] == "-":
+            if key[0:-1] == label_items_key:
+                return False
+            else:
+                return True
+        
+        # Check if label is found
+        if key == label_items_key:
+            return True
+
+    return False
 
 parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u","--username", help="Username to query")
-parser.add_argument("-l","--labels", help="Comma separated list to filter on (default: enhancement). Add '-' at end of each label to negate", type=string_to_list)
+parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
 args = parser.parse_args()
 
 start_date = args.start_date
 username = args.username
-input_labels = args.labels if args.labels else DEFAULT_LABEL_LIST
+input_labels = args.labels
 
 
 if start_date is None:
@@ -115,14 +143,14 @@ session.headers = {
 }
 
 # Produce Label String
-labels = process_labels(input_labels)
+input_labels = process_labels(args.labels)
 
 # Initialize Collection Statistics
 general_prs = {}
 closed_issues = {}
 reviewed_prs = {}
 
-org_search_issues = get_org_search_issues(session, start_date, labels)
+org_search_issues = get_org_search_issues(session, start_date)
 
 for issue in org_search_issues:
 
@@ -165,14 +193,28 @@ for issue in org_search_issues:
         if username is not None and issue_author_login != username:
             continue
 
-        # If We Have Gotten This Far, it is not an enhancement
-        if issue_author_id not in general_prs:
-            all_author_prs = []
-        else:
-            all_author_prs =general_prs[issue_author_id]
+        # Check if Label exists
+        if issue['labels']:
+            for label in issue['labels']:
+                
+                label_name = label['name']
 
-        all_author_prs.append(issue)
-        general_prs[issue_author_id] = all_author_prs
+                # Determine is Label Exists
+                if label_name not in general_prs:
+                    label_issues = {}
+                else:
+                    label_issues = general_prs[label_name]
+                
+                general_prs[label_name] = process_general_issues(issue,general_prs, label_issues)
+
+        else:
+            if UNLABELED not in general_prs:
+                label_issues = {}
+            else:
+                label_issues = general_prs[UNLABELED]
+
+            general_prs[UNLABELED] = process_general_issues(issue,general_prs, label_issues)
+
     else:
 
         if issue['state'] == 'closed' and issue['assignee'] is not None:
@@ -200,9 +242,13 @@ print "=== Statistics for GitHub Organization '{0}' ====".format(GITHUB_ORG)
 
 print "\n== General PR's ==\n"
 for key, value in general_prs.iteritems():
-    print "{0} - {1}".format(value[0]['user']['login'], len(value))
-    for issue_value in value:
-        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+    # Determine whether to print out Label
+    if(show_label(key, input_labels)):
+        print "{}:".format(key)
+        for label_key, label_value in value.iteritems():
+            print "  {0} - {1}".format(label_key, len(label_value))
+            for issue_value in label_value:
+                print "    {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():

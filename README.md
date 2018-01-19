@@ -62,7 +62,7 @@ By default, the script uses a search range from March 1 of a calendar year to th
 
 To limit to a specific user, the `--username` parameter can be specified.
 
-To filter by labels, the `--labels` parameter can be specified followed by a series of comma separated labels (such as `enhancement,bugfix`). To limit the results containing a label, add a `-` at the end of the label name, such as `bugfix-` If no label parameter is specified, the _enhancement_ label is automatically applied.
+To filter by labels, the `--labels` parameter can be specified followed by a series of comma separated labels. To limit the results containing a label, add a `-` at the end of the label name, such as `bugfix-` Note: Positive and negative logic cannot be combined.
 
 
 ## Trello
