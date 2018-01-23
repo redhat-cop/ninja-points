@@ -52,15 +52,18 @@ $ ./github-stats.py
 
 === Statistics for GitHub Organization 'redhat-cop' ====
 
-== Enhancement PR's ==
+== General PR's ==
 
-csmith - 1
-   ninja-points - Enhancement to GitHub script
+enhancement:
+  csmith - 1
+    ninja-points - Enhancement to GitHub script
 ```
 
 By default, the script uses a search range from March 1 of a calendar year to the present. To specify an alternate date, use the `--start-date` argument such as `--start-date=2017-09-01`.
 
 To limit to a specific user, the `--username` parameter can be specified.
+
+To filter by labels, the `--labels` parameter can be specified followed by a series of comma separated labels. To limit the results containing a label, add a `-` at the end of the label name, such as `bugfix-` Note: Positive and negative logic cannot be combined.
 
 
 ## Trello

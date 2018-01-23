@@ -8,9 +8,9 @@ from dateutil.relativedelta import relativedelta
 GITHUB_API_TOKEN_NAME = 'GITHUB_API_TOKEN'
 GITHUB_ORG = 'redhat-cop'
 USER_AGENT= 'redhat-cop-stats'
-ENHANCEMENT_LABEL = 'enhancement'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
+UNLABELED = 'unlabeled'
 
 def handle_pagination_items(session, url):
     
@@ -65,28 +65,65 @@ def get_reviews(session, url):
     return pr_request.json()
 
 def get_org_search_issues(session, start_date):
-    
-    query = "https://api.github.com/search/issues?q=user:redhat-cop+updated:>={}+archived:false+state:closed".format(start_date.date().isoformat())
+
+    query = "https://api.github.com/search/issues?q=user:{}+updated:>={}+archived:false+state:closed".format(GITHUB_ORG, start_date.date().isoformat())
     return handle_pagination_items(session, query)
 
-def has_label(issue, label_name):
-    if not 'labels' in issue:
-        return False;
-    else:
-        for label in issue['labels']:
-            if label['name'] == label_name:
-                return True
-    
-    return False
+def process_labels(labels):
+    label_dict = {}
 
+    if labels:
+        for x in labels.split(','):
+            label_dict[x.strip()] = None
+
+    return label_dict
+
+def process_general_issues(issue, all_prs, label_prs):
+    
+    author_login = issue['user']['login']
+
+    if author_login not in label_prs:
+            all_author_prs = []
+    else:
+        all_author_prs = label_prs[author_login]
+
+    all_author_prs.append(issue)
+    label_prs[author_login] = all_author_prs
+
+    return label_prs
+
+def show_label(label_items_key, input_labels):
+    
+    # Check if length of input labels is 0. If so, show all labels
+    if len(input_labels) == 0:
+        return True
+
+    # Loop through input labels
+    for key in input_labels:
+
+        # Check if label should be omitted
+        if key[-1] == "-":
+            if key[0:-1] == label_items_key:
+                return False
+            else:
+                return True
+        
+        # Check if label is found
+        if key == label_items_key:
+            return True
+
+    return False
 
 parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u","--username", help="Username to query")
+parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
 args = parser.parse_args()
 
 start_date = args.start_date
 username = args.username
+input_labels = args.labels
+
 
 if start_date is None:
     start_date = generate_start_date()
@@ -105,9 +142,11 @@ session.headers = {
     'User-Agent': USER_AGENT
 }
 
+# Produce Label String
+input_labels = process_labels(args.labels)
+
 # Initialize Collection Statistics
-enhancement_prs = {}
-bugfix_prs = {}
+general_prs = {}
 closed_issues = {}
 reviewed_prs = {}
 
@@ -154,27 +193,28 @@ for issue in org_search_issues:
         if username is not None and issue_author_login != username:
             continue
 
-        # Scroll Through Labels
-        # If Enhancement, Add to Bucket
-        if has_label(issue, ENHANCEMENT_LABEL):
-            
-            if issue_author_id not in enhancement_prs:
-                enhancement_author_prs = []
-            else:
-                enhancement_author_prs = enhancement_prs[issue_author_id]
+        # Check if Label exists
+        if issue['labels']:
+            for label in issue['labels']:
+                
+                label_name = label['name']
 
-            enhancement_author_prs.append(issue)
-            enhancement_prs[issue_author_id] = enhancement_author_prs
-            continue
+                # Determine is Label Exists
+                if label_name not in general_prs:
+                    label_issues = {}
+                else:
+                    label_issues = general_prs[label_name]
+                
+                general_prs[label_name] = process_general_issues(issue,general_prs, label_issues)
 
-        # If We Have Gotten This Far, it is not an enhancement
-        if issue_author_id not in bugfix_prs:
-            bugfix_author_prs = []
         else:
-            bugfix_author_prs = bugfix_prs[issue_author_id]
+            if UNLABELED not in general_prs:
+                label_issues = {}
+            else:
+                label_issues = general_prs[UNLABELED]
 
-        bugfix_author_prs.append(issue)
-        bugfix_prs[issue_author_id] = bugfix_author_prs
+            general_prs[UNLABELED] = process_general_issues(issue,general_prs, label_issues)
+
     else:
 
         if issue['state'] == 'closed' and issue['assignee'] is not None:
@@ -200,17 +240,15 @@ for issue in org_search_issues:
 
 print "=== Statistics for GitHub Organization '{0}' ====".format(GITHUB_ORG)      
 
-print "\n== Enhancement PR's ==\n"
-for key, value in enhancement_prs.iteritems():
-    print "{0} - {1}".format(value[0]['user']['login'], len(value))
-    for issue_value in value:
-        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
-
-print "\n== Bugfix PR's ==\n"
-for key, value in bugfix_prs.iteritems():
-    print "{0} - {1}".format(value[0]['user']['login'], len(value))
-    for issue_value in value:
-        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+print "\n== General PR's ==\n"
+for key, value in general_prs.iteritems():
+    # Determine whether to print out Label
+    if(show_label(key, input_labels)):
+        print "{}:".format(key)
+        for label_key, label_value in value.iteritems():
+            print "  {0} - {1}".format(label_key, len(label_value))
+            for issue_value in label_value:
+                print "    {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():
