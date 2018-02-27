@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, json, requests, sys, argparse
+import os, json, requests, sys, argparse, collections, re
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
@@ -9,6 +9,7 @@ TRELLO_API_KEY_NAME = 'TRELLO_API_KEY'
 TRELLO_API_TOKEN_NAME = 'TRELLO_API_TOKEN'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
+CARD_TITLE_POINTS_REGEX_PATTERN = re.compile(r"\(([0-9]+)\)")
 
 # Search for cards that are done and have been modified in the past 30 days
 TRELLO_SEARCH_QUERY = 'list:Done edited:{0} {1}'
@@ -41,7 +42,7 @@ def search_cards(session, org_id, days, author):
     author = "@{0}".format(author) if author is not None else ""
 
     query = TRELLO_SEARCH_QUERY.format(days, author)
-    print query
+
     card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idMembers', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
     card_request.raise_for_status()
 
@@ -52,6 +53,21 @@ def get_member(session, member_id):
     member_request.raise_for_status()
 
     return member_request.json()
+
+def plural_items(text, obj):
+    if obj is not None and (isinstance(obj, collections.Iterable) and len(obj) == 1) or obj == 1:
+        return text[:-1]
+    else:
+        return text
+
+def calculate_points(text):
+
+    matches = re.findall(CARD_TITLE_POINTS_REGEX_PATTERN, text)
+
+    if(len(matches) == 0):
+        return 1
+    else:
+        return int(matches[-1])
 
 def encode_text(text):
     if text:
@@ -93,7 +109,7 @@ org_id = org_response['id']
 resp_cards = search_cards(session, org_id, days, username)
 
 cards = {}
-members_cards = {}
+members_items = {}
 
 for card in resp_cards['cards']:
     
@@ -108,22 +124,28 @@ for card in resp_cards['cards']:
            
             member_id = member
 
-            if member_id not in members_cards:
+            if member_id not in members_items:
+                member_items= {}
+                member_items['points'] = 0
+                member_items['cards'] = []
                 member_cards = []
             else:
-                member_cards = members_cards[member_id]
+                member_items = members_items[member_id]
             
-            member_cards.append(card_id)
+            member_items['cards'].append(card_id)
+            member_items['points'] += calculate_points(card['name'])
 
-            members_cards[member_id] = member_cards
+            members_items[member_id] = member_items
 
 print "=== Statistics for Trello Team '{0}' ====\n".format(encode_text(org_response['displayName']) if 'displayName' in org_response else encode_text(org_response['name']))
-for key, value in members_cards.iteritems():
+for key, value in members_items.iteritems():
         member = get_member(session, key)
+        value_points = value['points']
+        value_cards = value['cards']
 
         if username is not None and member['username'] != username:
             continue
 
-        print "{0} has {1} cards".format(encode_text(member['username']), len(value))
-        for card in value:
+        print "{0} has {1} {2} - {3} {4}".format(encode_text(member['username']), len(value_cards), plural_items("cards", value_cards), value_points, plural_items("points", value_points))
+        for card in value['cards']:
             print "   - Board: {0} | Card: {1}".format(encode_text(cards[card]['board']['name']), encode_text(cards[card]['name']))
