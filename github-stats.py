@@ -116,6 +116,7 @@ def show_label(label_items_key, input_labels):
 
 parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
+parser.add_argument("-r","--human-readable", action="store_true", help="Human readable format")
 parser.add_argument("-u","--username", help="Username to query")
 parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
 args = parser.parse_args()
@@ -124,6 +125,7 @@ start_date = args.start_date
 username = args.username
 input_labels = args.labels
 
+human_readable=(args.human_readable==True)
 
 if start_date is None:
     start_date = generate_start_date()
@@ -154,6 +156,7 @@ org_search_issues = get_org_search_issues(session, start_date)
 
 for issue in org_search_issues:
 
+#    print "{}:".format(issue['id'])
     issue_author_id = issue['user']['id']
     issue_author_login = issue['user']['login']
 
@@ -240,25 +243,38 @@ for issue in org_search_issues:
 
 print "=== Statistics for GitHub Organization '{0}' ====".format(GITHUB_ORG)      
 
+
 print "\n== General PR's ==\n"
 for key, value in general_prs.iteritems():
     # Determine whether to print out Label
     if(show_label(key, input_labels)):
-        print "{}:".format(key)
+        if (human_readable):
+            print "{}:".format(key)
         for label_key, label_value in value.iteritems():
-            print "  {0} - {1}".format(label_key, len(label_value))
+            if (human_readable):
+                print "  {0} - {1}".format(label_key, len(label_value))
             for issue_value in label_value:
-                print "    {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+                if (not human_readable):
+                    print "Pull Requests/GH{0}/{1}/{2}".format(issue_value['id'], label_key, 1)
+                else:
+                    print "    {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():
-    print "{0} - {1}".format(key, len(value))
-    for issue_key, issue_value in value.iteritems():
-        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+    if (not human_readable):
+        print "Reviewed Pull Requests/GH{0}/{1}/{2}".format(issue_value['id'], key, 1)
+    else:
+        print "{0} - {1}".format(key, len(value))
+        for issue_key, issue_value in value.iteritems():
+            print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
 print "\n== Closed Issues ==\n"
-
 for key, value in closed_issues.iteritems():
-    print "{0} - {1}".format(value[0]['assignee']['login'], len(value))
-    for issue_value in value:
-        print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+    if (not human_readable):
+        print "Closed Issues/GH{0}/{1}/{2}".format(key, value[0]['assignee']['login'], len(value))
+    else:
+        print "{0} - {1}".format(value[0]['assignee']['login'], len(value))
+        for issue_value in value:
+            print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+
+

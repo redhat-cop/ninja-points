@@ -11,8 +11,10 @@ DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
 CARD_TITLE_POINTS_REGEX_PATTERN = re.compile(r"\(([0-9]+)\)")
 
-# Search for cards that are done and have been modified in the past 30 days
+# Search for cards that are done and have been modified in the past ? days
 TRELLO_SEARCH_QUERY = 'list:Done edited:{0} {1}'
+
+memberCache={}
 
 def valid_date(s):
     try:
@@ -43,16 +45,23 @@ def search_cards(session, org_id, days, author):
 
     query = TRELLO_SEARCH_QUERY.format(days, author)
 
-    card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idMembers', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
+    card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idMembers,idLabels', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
     card_request.raise_for_status()
 
     return card_request.json()
 
 def get_member(session, member_id):
-    member_request = session.get("https://api.trello.com/1/members/{0}".format(member_id))
-    member_request.raise_for_status()
-
-    return member_request.json()
+		
+		if member_id not in memberCache:
+		    member_request = session.get("https://api.trello.com/1/members/{0}".format(member_id))
+		    member_request.raise_for_status()
+		    memberCache[member_id]=member_request.json()
+		
+		return memberCache.get(member_id)
+		
+#    member_request = session.get("https://api.trello.com/1/members/{0}".format(member_id))
+#    member_request.raise_for_status()
+#    return member_request.json()
 
 def plural_items(text, obj):
     if obj is not None and (isinstance(obj, collections.Iterable) and len(obj) == 1) or obj == 1:
@@ -87,6 +96,7 @@ if not trello_api_key or not trello_api_token:
 parser = argparse.ArgumentParser(description='Gather Trello Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u","--username", help="Username to query")
+parser.add_argument("-r","--human-readable", action="store_true", help="Human readable format")
 args = parser.parse_args()
 
 start_date = args.start_date
@@ -94,6 +104,8 @@ username = args.username
 
 if start_date is None:
     start_date = generate_start_date()
+
+human_readable=(args.human_readable==True)
 
 days = (datetime.now() - start_date).days
 
@@ -136,9 +148,13 @@ for card in resp_cards['cards']:
             member_items['points'] += calculate_points(card['name'])
 
             members_items[member_id] = member_items
+            if (not human_readable):
+                print "Cards Closed/TR{0}/{1}/{2}".format(card_id, get_member(session, member_id)['username'], 1)
 
-print "=== Statistics for Trello Team '{0}' ====\n".format(encode_text(org_response['displayName']) if 'displayName' in org_response else encode_text(org_response['name']))
-for key, value in members_items.iteritems():
+
+if (human_readable):
+    print "=== Statistics for Trello Team '{0}' ====\n".format(encode_text(org_response['displayName']) if 'displayName' in org_response else encode_text(org_response['name']))
+    for key, value in members_items.iteritems():
         member = get_member(session, key)
         value_points = value['points']
         value_cards = value['cards']
@@ -149,3 +165,4 @@ for key, value in members_items.iteritems():
         print "{0} has {1} {2} - {3} {4}".format(encode_text(member['username']), len(value_cards), plural_items("cards", value_cards), value_points, plural_items("points", value_points))
         for card in value['cards']:
             print "   - Board: {0} | Card: {1}".format(encode_text(cards[card]['board']['name']), encode_text(cards[card]['name']))
+
