@@ -43,7 +43,6 @@ def handle_pagination_items(session, url):
     pagination_request.raise_for_status()
 
     if 'next' in pagination_request.headers["Link"] and pagination_request.links['next']:
-        print pagination_request.links['next']['url']
         return pagination_request.json() + handle_pagination_items(session, pagination_request.links['next']['url'])
     else:
         return pagination_request.json()

@@ -170,7 +170,7 @@ if error is not None:
     print error
     sys.exit(1)
 
-channels = get_channels(session, server,)
+channels = get_channels(session, server)
 
 filter_channels(channels, filtered_text)
 
