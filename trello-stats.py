@@ -153,7 +153,7 @@ for card in resp_cards['cards']:
 
             members_items[member_id] = member_items
             if (not human_readable):
-                print "Cards Closed/TR{0}/{1}/{2}".format(card_id, get_member(session, member_id)['username'], member_items['points'])
+                print "Cards Closed/TR{0}/{1}/{2} [linkId={3}]".format(card_id, get_member(session, member_id)['username'], member_items['points'], card['shortLink'])
 
 
 if (human_readable):
