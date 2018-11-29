@@ -149,11 +149,12 @@ for card in resp_cards['cards']:
                 member_items = members_items[member_id]
             
             member_items['cards'].append(card_id)
-            member_items['points'] += calculate_points(card['name'])
+            points = calculate_points(card['name'])
+            member_items['points'] += points
 
             members_items[member_id] = member_items
             if (not human_readable):
-                print "Cards Closed/TR{0}/{1}/{2} [linkId={3}]".format(card_id, get_member(session, member_id)['username'], member_items['points'], card['shortLink'])
+                print "Cards Closed/TR{0}/{1}/{2} [linkId={3}]".format(card_id, get_member(session, member_id)['username'], points, card['shortLink'])
 
 
 if (human_readable):
