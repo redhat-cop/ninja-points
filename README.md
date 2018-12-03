@@ -170,3 +170,49 @@ $ ./rocketchat.py -d 2 -f "#cop-channel"
 ```
 
 The script queries channels with a particular description as specified by the `-f` parameter and the number of days to search in the past using the `-d` parameter.
+
+## GitLab
+
+A script called [gitlab-stats.py](gitlab-stats.py) contributions made within within an organization.
+
+To be able to query the GitLab API, create a new [Personal Access Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html).
+
+Then configure the `GITLAB_API_TOKEN` environment variable as follows:
+
+```
+export GITLAB_API_TOKEN='<API_KEY>'
+```
+
+Execute the script:
+
+$ ./gitlab-stats.py
+
+=== Statistics for GitLab Group 'redhat-cop' ====
+
+== Merged MR's ==
+
+dhowe - 1
+  ninja-points - Minor change to GitLab script
+```
+
+## Google Hangouts Chat
+
+### Script
+
+A script called [hangouts-chat.py](hangouts-chat.py) is available to automate statistics from [Google Hangouts Chat](https://chat.google.com).
+
+A service account token file is used to authenticate to the Google. Configure the following variable specifying the location of this file:
+
+```
+export SERVICE_ACCOUNT_KEY_FILE='<SERVICE_ACCOUNT_KEY_FILE>'
+```
+
+Execute the script:
+
+```
+$ ./hangouts-chat.py"
+=== Statistics for Google Hangouts Chat
+
+- containers - 55 Members
+- openshift-development - 311 Members
+```
