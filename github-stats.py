@@ -262,7 +262,8 @@ for key, value in general_prs.iteritems():
 print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():
     if (not human_readable):
-        print "Reviewed Pull Requests/GH{0}/{1}/{2}".format(issue_value['id'], key, 1)
+        for issue_key, issue_value in value.iteritems():
+            print "Reviewed Pull Requests/GH{0}/{1}/{2}".format(issue_value['id'], key, 1)
     else:
         print "{0} - {1}".format(key, len(value))
         for issue_key, issue_value in value.iteritems():
