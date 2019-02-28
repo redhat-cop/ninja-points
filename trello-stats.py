@@ -14,7 +14,14 @@ CARD_TITLE_POINTS_REGEX_PATTERN = re.compile(r"\(([0-9]+)\)")
 # Search for cards that are done and have been modified in the past ? days
 TRELLO_SEARCH_QUERY = 'list:Done edited:{0} {1}'
 
+debug=False
 memberCache={}
+memberCacheBoards=[]
+requestCount_org=0
+requestCount_orgMembers=0
+requestCount_member=0  #we need to limit these requests
+requestCount_boardMembers=0
+requestCount_cards=0
 
 def valid_date(s):
     try:
@@ -33,32 +40,30 @@ def generate_start_date():
     return target_start_date
 
 def get_org_id(session):
-    
     org_request = session.get("https://api.trello.com/1/organizations/{0}".format(TRELLO_ORG_NAME))
+    global requestCount_org
+    requestCount_org+=1
     org_request.raise_for_status()
-
     return org_request.json()
 
 def search_cards(session, org_id, days, author):
-    
     author = "@{0}".format(author) if author is not None else ""
-
     query = TRELLO_SEARCH_QUERY.format(days, author)
-
-    card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idMembers,idLabels,shortLink', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
+    card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idBoard,idMembers,idLabels,shortLink', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
+    global requestCount_cards
+    requestCount_cards+=1
     card_request.raise_for_status()
-
     return card_request.json()
 
 def get_member(session, member_id):
-		
 		if member_id not in memberCache:
 		    member_request = session.get("https://api.trello.com/1/members/{0}".format(member_id))
+		    global requestCount_member
+		    requestCount_member+=1
 		    member_request.raise_for_status()
 		    memberCache[member_id]=member_request.json()
-		
+		    if debug: print "get_member:: memberCache.add({0})".format(memberCache[member_id]['username'])
 		return memberCache.get(member_id)
-		
 
 def plural_items(text, obj):
     if obj is not None and (isinstance(obj, collections.Iterable) and len(obj) == 1) or obj == 1:
@@ -67,12 +72,12 @@ def plural_items(text, obj):
         return text
 
 def calculate_points(text):
-
     matches = re.findall(CARD_TITLE_POINTS_REGEX_PATTERN, text)
+    
     if(len(matches) == 0):
         return 1
     else:
-        return int(matches[-1])
+        return min(5,int(matches[-1])); # cap at a maximum of 5 points for any card
 
 def encode_text(text):
     if text:
@@ -80,11 +85,30 @@ def encode_text(text):
 
     return text
 
-def preload_member_cache(session, org_id):
+def preload_member_cache_from_org(session, org_id):
+    # Add the organization members
     members = session.get("https://api.trello.com/1/organizations/{0}/members".format(org_id))
+    global requestCount_orgMembers
+    requestCount_orgMembers+=1
     members.raise_for_status()
     for member in members.json():
-        memberCache[member['id']]=member
+        add_member_to_cache(member)
+    
+def preload_member_cache_from_board(session, board_id):
+    # Add the boards members
+    if board_id not in memberCacheBoards:
+        board_members=session.get("https://api.trello.com/1/boards/{0}/members".format(board_id))
+        global requestCount_boardMembers
+        requestCount_boardMembers+=1
+        for member in board_members.json():
+            add_member_to_cache(member)
+        memberCacheBoards.append(board_id)
+
+def add_member_to_cache(member):
+    if member['id'] not in memberCache:
+        if debug: print "add_member_to_cache:: memberCache.add({0})".format(member['username'])
+        memberCache[member['id']] = {"id":member['id'], "username":member['username'], "fullName":member['fullName']}
+
 
 
 trello_api_key = os.environ.get(TRELLO_API_KEY_NAME)
@@ -125,16 +149,20 @@ resp_cards = search_cards(session, org_id, days, username)
 cards = {}
 members_items = {}
 
-preload_member_cache(session, org_id)
+preload_member_cache_from_org(session, org_id)
 
 for card in resp_cards['cards']:
     
     if not card['board']['idOrganization'] or card['board']['idOrganization'] != org_id:
         continue 
-
+    
     card_id = card['id']
     cards[card_id] = card
-
+    
+    # pre-load the members from the board this card belongs to (because that's more efficient that loading members one-by-one later on)
+    preload_member_cache_from_board(session, card['idBoard'])
+    
+    
     if 'idMembers' in card:
         for member in card['idMembers']:
            
@@ -170,3 +198,5 @@ if (human_readable):
         print "{0} has {1} {2} - {3} {4}".format(encode_text(member['username']), len(value_cards), plural_items("cards", value_cards), value_points, plural_items("points", value_points))
         for card in value['cards']:
             print "   - Board: {0} | Card: {1}".format(encode_text(cards[card]['board']['name']), encode_text(cards[card]['name']))
+
+if debug: print "REQUESTS: org={0}, orgMembers={1}, member={2}, boardMembers={3}, cards={4}".format(requestCount_org, requestCount_orgMembers, requestCount_member, requestCount_boardMembers, requestCount_cards)
