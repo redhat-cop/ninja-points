@@ -34,7 +34,7 @@ def generate_start_date():
     today_date = datetime.now()
     target_start_date = datetime.strptime("{0}-{1}-{02}".format(today_date.year, DEFAULT_START_DATE_MONTH, DEFAULT_START_DATE_DAY), "%Y-%m-%d")
 
-    if target_start_date.month < int(DEFAULT_START_DATE_MONTH):
+    if today_date.month < int(DEFAULT_START_DATE_MONTH):
         target_start_date = target_start_date - relativedelta(years=1)
 
     return target_start_date
