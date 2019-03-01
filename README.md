@@ -123,6 +123,7 @@ export GITLAB_API_TOKEN='<API_KEY>'
 
 Execute the script:
 
+```
 $ ./gitlab-stats.py
 
 === Statistics for GitLab Group 'redhat-cop' ====
@@ -206,7 +207,6 @@ A service account token file is used to authenticate to the Google. Configure th
 ```
 export SERVICE_ACCOUNT_KEY_FILE='<SERVICE_ACCOUNT_KEY_FILE>'
 ```
-
 Execute the script:
 
 ```
@@ -215,4 +215,18 @@ $ ./hangouts-chat.py"
 
 - containers - 55 Members
 - openshift-development - 311 Members
+
+## Mailman
+
+### Script
+
+A script called [mailman-subscribers.py](mailman-subscribers.py) is available to collect statistics based on mailing list subscriptions.
+
+Execute the script:
+
+$ ./mailman-subscribers [ options ] hostname listname password
+
+ashore@redhat.com
+csmart@redhat.com
+mmurray@redhat.com
 ```
