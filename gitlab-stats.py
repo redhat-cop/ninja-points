@@ -124,7 +124,7 @@ for group_merge_request in group_merge_requests:
     if is_debug: print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(group_merge_request["state"], group_merge_request["updated_at"], group_merge_request['id'], group_merge_request['title'])
     
     if not human_readable:
-        print "Gitlab Merge Requests/GL{0}/{1}/{2}".format(group_merge_request['id'], group_merge_request['author']['username'], 1) # 1 points for all closed MR's
+        print "Merge Requests/GL{0}/{1}/{2}".format(group_merge_request['id'], group_merge_request['author']['username'], 1) # 1 points for all closed MR's
     
     merge_request_author_login = group_merge_request["author"]["username"]
 
