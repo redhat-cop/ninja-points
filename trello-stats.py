@@ -10,6 +10,7 @@ TRELLO_API_TOKEN_NAME = 'TRELLO_API_TOKEN'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
 CARD_TITLE_POINTS_REGEX_PATTERN = re.compile(r"\(([0-9]+)\)")
+DEFAULT_POINTS_GROUPING = "Cards Closed"
 
 # Search for cards that are done and have been modified in the past ? days
 TRELLO_SEARCH_QUERY = 'list:Done edited:{0} {1}'
@@ -40,6 +41,7 @@ def generate_start_date():
     return target_start_date
 
 def get_org_id(session):
+    #print "org = {0}".format(TRELLO_ORG_NAME)
     org_request = session.get("https://api.trello.com/1/organizations/{0}".format(TRELLO_ORG_NAME))
     global requestCount_org
     requestCount_org+=1
@@ -49,6 +51,7 @@ def get_org_id(session):
 def search_cards(session, org_id, days, author):
     author = "@{0}".format(author) if author is not None else ""
     query = TRELLO_SEARCH_QUERY.format(days, author)
+    #print "https://api.trello.com/1/search?query="+query+"&idOrganizations="+org_id+"&card_fields=name,idBoard,idMembers,idLabels,shortLink&board_fields=name,idOrganization&card_board=true&card_limit=1000"
     card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idBoard,idMembers,idLabels,shortLink', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
     global requestCount_cards
     requestCount_cards+=1
@@ -123,6 +126,8 @@ parser = argparse.ArgumentParser(description='Gather Trello Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u","--username", help="Username to query")
 parser.add_argument("-r","--human-readable", action="store_true", help="Human readable format")
+parser.add_argument("-o","--organization", help="Trello organization name")
+parser.add_argument("-p","--points-grouping", help="Points Bucket")
 args = parser.parse_args()
 
 start_date = args.start_date
@@ -132,6 +137,13 @@ if start_date is None:
     start_date = generate_start_date()
 
 human_readable=(args.human_readable==True)
+
+if args.organization is not None:
+    TRELLO_ORG_NAME=args.organization;
+
+points_grouping = args.points_grouping
+if points_grouping is None:
+    points_grouping = DEFAULT_POINTS_GROUPING
 
 days = (datetime.now() - start_date).days
 
@@ -153,13 +165,15 @@ preload_member_cache_from_org(session, org_id)
 
 for card in resp_cards['cards']:
     
+    #print "CARD:: {0}".format(card)
+    
     if not card['board']['idOrganization'] or card['board']['idOrganization'] != org_id:
         continue 
     
     card_id = card['id']
     cards[card_id] = card
     
-    # pre-load the members from the board this card belongs to (because that's more efficient that loading members one-by-one later on)
+    # pre-load the members from the board this card belongs to (because that's more efficient than loading members one-by-one later on)
     preload_member_cache_from_board(session, card['idBoard'])
     
     
@@ -182,7 +196,7 @@ for card in resp_cards['cards']:
 
             members_items[member_id] = member_items
             if (not human_readable):
-                print "Cards Closed/TR{0}/{1}/{2} [linkId={3}]".format(card_id, get_member(session, member_id)['username'], points, card['shortLink'])
+                print "{0}/TR{1}/{2}/{3} [linkId={4},board={5}]".format(points_grouping, card_id, get_member(session, member_id)['username'], points, card['shortLink'], card['board']['name'])
 
 
 if (human_readable):
