@@ -51,7 +51,6 @@ def get_org_id(session):
 def search_cards(session, org_id, days, author):
     author = "@{0}".format(author) if author is not None else ""
     query = TRELLO_SEARCH_QUERY.format(days, author)
-    #print "https://api.trello.com/1/search?query="+query+"&idOrganizations="+org_id+"&card_fields=name,idBoard,idMembers,idLabels,shortLink&board_fields=name,idOrganization&card_board=true&card_limit=1000"
     card_request = session.get("https://api.trello.com/1/search", params={'query': query, 'idOrganizations': org_id, 'card_fields': 'name,idBoard,idMembers,idLabels,shortLink', 'board_fields': 'name,idOrganization', 'card_board': 'true', 'cards_limit': 1000})
     global requestCount_cards
     requestCount_cards+=1
@@ -164,8 +163,6 @@ members_items = {}
 preload_member_cache_from_org(session, org_id)
 
 for card in resp_cards['cards']:
-    
-    #print "CARD:: {0}".format(card)
     
     if not card['board']['idOrganization'] or card['board']['idOrganization'] != org_id:
         continue 
