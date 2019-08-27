@@ -255,7 +255,7 @@ for key, value in general_prs.iteritems():
                 print "  {0} - {1}".format(label_key, len(label_value))
             for issue_value in label_value:
                 if (not human_readable):
-                    print "Pull Requests/GH{0}/{1}/{2}".format(issue_value['id'], label_key, 1)
+                    print "Pull Requests/GH{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(issue_value['id'], label_key, 1, issue_value['repository_url'].split('/')[-2], issue_value['repository_url'].split('/')[-1], issue_value['number'])
                 else:
                     print "    {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
 
@@ -263,7 +263,7 @@ print "\n== Reviewed PR's ==\n"
 for key, value in reviewed_prs.iteritems():
     if (not human_readable):
         for issue_key, issue_value in value.iteritems():
-            print "Reviewed Pull Requests/GH{0}/{1}/{2}".format(issue_value['id'], key, 1)
+            print "Reviewed Pull Requests/GH{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(issue_value['id'], key, 1, issue_value['repository_url'].split('/')[-2], issue_value['repository_url'].split('/')[-1], issue_value['number'])
     else:
         print "{0} - {1}".format(key, len(value))
         for issue_key, issue_value in value.iteritems():
@@ -272,7 +272,7 @@ for key, value in reviewed_prs.iteritems():
 print "\n== Closed Issues ==\n"
 for key, value in closed_issues.iteritems():
     if (not human_readable):
-        print "Closed Issues/GH{0}/{1}/{2}".format(key, value[0]['assignee']['login'], len(value))
+        print "Closed Issues/GH{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(key, value[0]['assignee']['login'], len(value), issue_value['repository_url'].split('/')[-2], issue_value['repository_url'].split('/')[-1], issue_value['number'])
     else:
         print "{0} - {1}".format(value[0]['assignee']['login'], len(value))
         for issue_value in value:
