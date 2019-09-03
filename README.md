@@ -35,7 +35,7 @@ is:closed is:issue archived:false user:redhat-cop assignee:etsauer updated:>=201
 
 ### Script
 
-A script called [github-stats.py](tgithub-stats.py) is available to automate the aggregation of statistics from the [redhat-cop GitHub organization](https://github.com/redhat-cop).
+A script called [github-stats.py](github-stats.py) is available to automate the aggregation of statistics from the [redhat-cop GitHub organization](https://github.com/redhat-cop).
 
 To be able to query the GitHub API, create a new [Personal Access Token](https://github.com/settings/tokens). Configure a key with at least read access.
 
