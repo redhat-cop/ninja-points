@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, json, requests, sys, pytz, argparse, dateutil.parser
+import os, json, requests, sys, pytz, argparse, dateutil.parser, re
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
@@ -12,7 +12,7 @@ GITLAB_SERVER_DEFAULT = 'https://gitlab.consulting.redhat.com'
 GITLAB_GROUP_DEFAULT ='redhat-cop'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
-
+DEFAULT_POINTS_GROUPING = 'Merge Requests'
 merged_mrs = {}
 
 req_group = 0
@@ -63,17 +63,17 @@ def get_group_with_projects(session, server, group_name):
     groups.raise_for_status()
     return groups.json()
 
-def is_merge_request_in_project_group(merge_request, group):
+def is_merge_request_in_project_group(merge_request, group, repo_matcher):
     for project in group["projects"]:
-        if project["id"] == merge_request["target_project_id"]:
+        repo_name_matches = True if re.match(repo_matcher, project["name"]) != None else False
+        if repo_name_matches and (project["id"] == merge_request["target_project_id"]):
             return True
     
     return False
 
-def get_group_merge_requests(session, server, group):
-    # there is an 'updated_after' parameter, however I've been unable to make it work to reduce the number of http calls
-    all_merge_requests = handle_pagination_items(session, "{0}/api/v4/merge_requests?state=merged&scope=all&per_page=1000".format(server))
-    return [item for item in all_merge_requests if is_merge_request_in_project_group(item, group)]
+def get_group_merge_requests(session, server, group, repo_matcher, start_date):
+    all_merge_requests = handle_pagination_items(session, "{0}/api/v4/merge_requests?state=merged&scope=all&per_page=1000&created_after={1}".format(server, start_date.strftime("%Y-%m-%d")))
+    return [item for item in all_merge_requests if is_merge_request_in_project_group(item, group, repo_matcher)]
 
 
 parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
@@ -81,6 +81,9 @@ parser.add_argument("-s","--start-date", help="The start date to query from", ty
 parser.add_argument("-u","--username", help="Username to query")
 parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
 parser.add_argument("-r","--human-readable", help="Human readable display")
+parser.add_argument("-o","--organization", help="Organization name")
+parser.add_argument("-p","--points-grouping", help="Points Bucket")
+parser.add_argument("-m","--repo-matcher", help="Repo Matcher")
 args = parser.parse_args()
 
 start_date = args.start_date
@@ -93,8 +96,20 @@ if start_date is None:
 
 start_date = pytz.utc.localize(start_date)
 
+gitlab_group = args.organization
+if gitlab_group is None:
+    gitlab_group = GITLAB_GROUP_DEFAULT
+
+points_grouping = args.points_grouping
+if points_grouping is None:
+    points_grouping = DEFAULT_POINTS_GROUPING
+
+repo_matcher = args.repo_matcher
+if repo_matcher is None:
+    repo_matcher = ".+"
+
+
 gitlab_api_token = os.environ.get(GITLAB_API_TOKEN_NAME)
-gitlab_group = os.getenv(GITLAB_GROUP_NAME, GITLAB_GROUP_DEFAULT)
 gitlab_server = os.getenv(GITLAB_SERVER_NAME, GITLAB_SERVER_DEFAULT)
 
 if not gitlab_api_token:
@@ -113,7 +128,7 @@ if group is None:
     print "Unable to Locate Group!"
     sys.exit(1)
 
-group_merge_requests = get_group_merge_requests(session, gitlab_server, group)
+group_merge_requests = get_group_merge_requests(session, gitlab_server, group, repo_matcher, start_date)
 
 for group_merge_request in group_merge_requests:
     
@@ -124,7 +139,7 @@ for group_merge_request in group_merge_requests:
     if is_debug: print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(group_merge_request["state"], group_merge_request["updated_at"], group_merge_request['id'], group_merge_request['title'])
     
     if not human_readable:
-        print "Merge Requests/GL{0}/{1}/{2}".format(group_merge_request['id'], group_merge_request['author']['username'], 1) # 1 points for all closed MR's
+        print "{0}/GL{1}/{2}/{3}".format(points_grouping, group_merge_request['id'], group_merge_request['author']['username'], 1) # 1 points for all closed MR's
     
     merge_request_author_login = group_merge_request["author"]["username"]
 
