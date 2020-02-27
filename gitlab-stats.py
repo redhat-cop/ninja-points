@@ -63,51 +63,44 @@ def get_group_with_projects(session, server, group_name):
     groups.raise_for_status()
     return groups.json()
 
-def is_merge_request_in_project_group(merge_request, group, repo_matcher):
+def is_merge_request_in_project_group(merge_request, group, repo_matcher, repo_excluder):
     for project in group["projects"]:
         repo_name_matches = True if re.match(repo_matcher, project["name"]) != None else False
-        if repo_name_matches and (project["id"] == merge_request["target_project_id"]):
+        repo_name_excluded = True if None != repo_excluder and re.match(repo_excluder, project["name"]) != None else False
+        if repo_name_matches and repo_name_excluded == False and (project["id"] == merge_request["target_project_id"]):
             return True
     
     return False
 
-def get_group_merge_requests(session, server, group, repo_matcher, start_date):
+def get_group_merge_requests(session, server, group, repo_matcher, repo_excluder, start_date):
     all_merge_requests = handle_pagination_items(session, "{0}/api/v4/merge_requests?state=merged&scope=all&per_page=1000&created_after={1}".format(server, start_date.strftime("%Y-%m-%d")))
-    return [item for item in all_merge_requests if is_merge_request_in_project_group(item, group, repo_matcher)]
-
+    return [item for item in all_merge_requests if is_merge_request_in_project_group(item, group, repo_matcher, repo_excluder)]
 
 parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u","--username", help="Username to query")
 parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
 parser.add_argument("-r","--human-readable", help="Human readable display")
-parser.add_argument("-o","--organization", help="Organization name")
-parser.add_argument("-p","--points-grouping", help="Points Bucket")
-parser.add_argument("-m","--repo-matcher", help="Repo Matcher")
+parser.add_argument("-o","--organization", help="Organization name", default=GITLAB_GROUP_DEFAULT)
+parser.add_argument("-p","--points-grouping", help="Points Bucket", default=DEFAULT_POINTS_GROUPING)
+parser.add_argument("-m","--repo-matcher", help="Repo Matcher", default=".+")
+parser.add_argument("-x","--repo-excluder", help="Repo Excluder")
 args = parser.parse_args()
 
 start_date = args.start_date
 username = args.username
 input_labels = args.labels
 human_readable = args.human_readable is not None
+gitlab_group = args.organization
+points_grouping = args.points_grouping
+repo_matcher = args.repo_matcher
+repo_excluder = args.repo_excluder
 
 if start_date is None:
     start_date = generate_start_date()
-
 start_date = pytz.utc.localize(start_date)
 
-gitlab_group = args.organization
-if gitlab_group is None:
-    gitlab_group = GITLAB_GROUP_DEFAULT
-
-points_grouping = args.points_grouping
-if points_grouping is None:
-    points_grouping = DEFAULT_POINTS_GROUPING
-
-repo_matcher = args.repo_matcher
-if repo_matcher is None:
-    repo_matcher = ".+"
-
+#print "Config:\n  - gitlab_group:    {0}\n  - points_grouping: {1}\n  - repo_matcher:    {2}\n  - repo_excluder:   {3}\n".format(gitlab_group, points_grouping, repo_matcher, repo_excluder)
 
 gitlab_api_token = os.environ.get(GITLAB_API_TOKEN_NAME)
 gitlab_server = os.getenv(GITLAB_SERVER_NAME, GITLAB_SERVER_DEFAULT)
@@ -128,7 +121,7 @@ if group is None:
     print "Unable to Locate Group!"
     sys.exit(1)
 
-group_merge_requests = get_group_merge_requests(session, gitlab_server, group, repo_matcher, start_date)
+group_merge_requests = get_group_merge_requests(session, gitlab_server, group, repo_matcher, repo_excluder, start_date)
 
 for group_merge_request in group_merge_requests:
     
