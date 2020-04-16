@@ -272,9 +272,9 @@ for key, value in reviewed_prs.iteritems():
 print "\n== Closed Issues ==\n"
 for key, value in closed_issues.iteritems():
     if (not human_readable):
-        print "Closed Issues/GH{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(key, value[0]['assignee']['login'], len(value), issue_value['repository_url'].split('/')[-2], issue_value['repository_url'].split('/')[-1], issue_value['number'])
+        print "Closed Issues/GH{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(key, value[0]['assignee']['login'], len(value), value[0]['repository_url'].split('/')[-2], value[0]['repository_url'].split('/')[-1], value[0]['number'])
     else:
         print "{0} - {1}".format(value[0]['assignee']['login'], len(value))
         for issue_value in value:
-            print "   {0} - {1}".format(encode_text(issue_value['repository_url'].split('/')[-1]), encode_text(issue_value['title']))
+            print "   {0} - {1}".format(encode_text(value['repository_url'].split('/')[-1]), encode_text(value[0]['title']))
 
