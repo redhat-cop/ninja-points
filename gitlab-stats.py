@@ -12,8 +12,9 @@ GITLAB_SERVER_DEFAULT = 'https://gitlab.consulting.redhat.com'
 GITLAB_GROUP_DEFAULT ='redhat-cop'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
-DEFAULT_POINTS_GROUPING = 'Merge Requests'
 merged_mrs = {}
+closed_issues = {}
+reviewed_mrs = {}
 
 req_group = 0
 req_pagination = 0
@@ -55,13 +56,18 @@ def handle_pagination_items(session, url):
         return pagination_request.json()
 
 
-def get_group_with_projects(session, server, group_name):
+def get_group_with_projects(session, server, group_name, repo_matcher):
     #groups = handle_pagination_items(session, "{0}/api/v4/groups?search={1}".format(server,group_name))
     groups = session.get("{0}/api/v4/groups/{1}".format(server,group_name))
     global req_group
     req_group+=1
     groups.raise_for_status()
-    return groups.json()
+    result=groups.json()
+    for project in reversed(result["projects"]):
+        regex_filter_out = re.match(repo_matcher, project["name"]) == None
+        if regex_filter_out:
+            result["projects"].remove(project)
+    return result
 
 def is_merge_request_in_project_group(merge_request, group, repo_matcher, repo_excluder):
     for project in group["projects"]:
@@ -76,15 +82,26 @@ def get_group_merge_requests(session, server, group, repo_matcher, repo_excluder
     all_merge_requests = handle_pagination_items(session, "{0}/api/v4/merge_requests?state=merged&scope=all&per_page=1000&created_after={1}".format(server, start_date.strftime("%Y-%m-%d")))
     return [item for item in all_merge_requests if is_merge_request_in_project_group(item, group, repo_matcher, repo_excluder)]
 
+def is_issue_in_project_group(issue, group, repo_matcher, repo_excluder):
+    for project in group["projects"]:
+        if project["id"] == issue["project_id"]:
+            return True
+    return False
+
+def get_group_issues(session, server, group, repo_matcher, repo_excluder, start_date):
+    all_issues = handle_pagination_items(session, "{0}/api/v4/groups/{1}/issues?state=closed&scope=all&per_page=1000&created_after={2}".format(server, group["id"], start_date.strftime("%Y-%m-%d")))
+    return [item for item in all_issues if is_issue_in_project_group(item, group, repo_matcher, repo_excluder)]
+
+
+
 parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u","--username", help="Username to query")
 parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
 parser.add_argument("-r","--human-readable", help="Human readable display")
 parser.add_argument("-o","--organization", help="Organization name", default=GITLAB_GROUP_DEFAULT)
-parser.add_argument("-p","--points-grouping", help="Points Bucket", default=DEFAULT_POINTS_GROUPING)
 parser.add_argument("-m","--repo-matcher", help="Repo Matcher", default=".+")
-parser.add_argument("-x","--repo-excluder", help="Repo Excluder")
+#parser.add_argument("-x","--repo-excluder", help="Repo Excluder")
 args = parser.parse_args()
 
 start_date = args.start_date
@@ -92,15 +109,13 @@ username = args.username
 input_labels = args.labels
 human_readable = args.human_readable is not None
 gitlab_group = args.organization
-points_grouping = args.points_grouping
 repo_matcher = args.repo_matcher
-repo_excluder = args.repo_excluder
+#repo_excluder = args.repo_excluder
+repo_excluder = None # this has been broken for now due to method "get_group_with_projects" but isn't used anyway
 
 if start_date is None:
     start_date = generate_start_date()
 start_date = pytz.utc.localize(start_date)
-
-#print "Config:\n  - gitlab_group:    {0}\n  - points_grouping: {1}\n  - repo_matcher:    {2}\n  - repo_excluder:   {3}\n".format(gitlab_group, points_grouping, repo_matcher, repo_excluder)
 
 gitlab_api_token = os.environ.get(GITLAB_API_TOKEN_NAME)
 gitlab_server = os.getenv(GITLAB_SERVER_NAME, GITLAB_SERVER_DEFAULT)
@@ -114,52 +129,117 @@ session.headers = {
     'Private-Token': gitlab_api_token
 }
 
-group = get_group_with_projects(session ,gitlab_server, gitlab_group)
 
+group = get_group_with_projects(session, gitlab_server, gitlab_group, repo_matcher)
 
 if group is None:
     print "Unable to Locate Group!"
     sys.exit(1)
 
+
 group_merge_requests = get_group_merge_requests(session, gitlab_server, group, repo_matcher, repo_excluder, start_date)
-
-for group_merge_request in group_merge_requests:
-    
+for mr in group_merge_requests:
     # Skip items that do not have a valid updated_at datetime
-    if dateutil.parser.parse(group_merge_request["updated_at"]) < start_date:
-        if is_debug: print "DEBUG:: Omit {0} MR {1} {2}/{3}".format(group_merge_request["state"], group_merge_request["updated_at"], group_merge_request['id'], group_merge_request['title'])
+    if dateutil.parser.parse(mr["updated_at"]) < start_date:
+        if is_debug: print "DEBUG:: Omit {0} MR {1} {2}/{3}".format(mr["state"], mr["updated_at"], mr['id'], mr['title'])
         continue
-    if is_debug: print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(group_merge_request["state"], group_merge_request["updated_at"], group_merge_request['id'], group_merge_request['title'])
+    if is_debug: print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(mr["state"], mr["updated_at"], mr['id'], mr['title'])
     
-    if not human_readable:
-        print "{0}/GL{1}/{2}/{3}".format(points_grouping, group_merge_request['id'], group_merge_request['author']['username'], 1) # 1 points for all closed MR's
+    # Check if MR has been merged
+    if not mr['merged_at']:
+        continue
     
-    merge_request_author_login = group_merge_request["author"]["username"]
-
-    #Filter out unwanted mr users
-    if username is not None and merge_request_author_login != username:
+    # Filter out unwanted mr users (if username is specified, then we're only interested in MRs that have that user either the author or merger)
+    if username is not None and (mr["author"]["username"] != username or mr["merged_by"]["username"] != username):
+        continue
+    
+    # Filter out if merged == author
+    if mr["author"]["username"] == mr["merged_by"]["username"]:
+        print "# Error: Author==Merged_by {0} {1} {2}".format(mr['id'], mr["author"]["username"], mr['title'])
         continue
 
-    if merge_request_author_login not in merged_mrs:
-        merge_request_author_prs = []
+    # Merged MRs
+    if mr["author"]["username"] not in merged_mrs:
+        author_mrs = []
     else:
-        merge_request_author_prs = merged_mrs[merge_request_author_login]
+        author_mrs = merged_mrs[mr["author"]["username"]]
+    author_mrs.append(mr)
+    merged_mrs[mr["author"]["username"]] = author_mrs
     
-    merge_request_author_prs.append(group_merge_request)
-    merged_mrs[merge_request_author_login] = merge_request_author_prs
+    # Reviewed MRs (assuming merged_by user is the reviewer, since GL doesn't have an "approve" feature in community edition)
+    if mr["merged_by"]["username"] not in reviewed_mrs:
+        reviewer_mrs = []
+    else:
+        reviewer_mrs = reviewed_mrs[mr["merged_by"]["username"]]
+    reviewer_mrs.append(mr)
+    reviewed_mrs[mr["merged_by"]["username"]] = reviewer_mrs
 
 
-if is_debug: print "DEBUG:: requests made: group={0}, pagination={1}".format(req_group, req_pagination)
 
-if not human_readable:
-    sys.exit(0)
+group_issues = get_group_issues(session, gitlab_server, group, repo_matcher, repo_excluder, start_date)
+for iss in group_issues:
+    if dateutil.parser.parse(iss["updated_at"]) < start_date:
+        if is_debug: print "DEBUG:: Omit {0} Issue {1} {2}/{3} (shortId={4})".format(iss["state"], iss["updated_at"], iss['id'], iss['title'], iss['iid'])
+        continue
+    if is_debug: print "DEBUG:: Incl {0} Issue {1} {2}/{3} (shortId={4})".format(iss["state"], iss["updated_at"], iss['id'], iss['title'], iss['iid'])
+
+    # Filter out if closed_by == author
+    if iss["author"]["username"] == iss["closed_by"]["username"]:
+# DISABLED SUPPORT INFORMATION UPDATES UNTIL FRONT END CAN USE THEM
+#        print "#Closed Issues/GL{0}/{1}/{2} [errorCode={6}, error={7}, org={3}, board={4}, linkId={5}]".format(iss['id'], iss["author"]["username"], 1, iss['web_url'].split('/')[3], iss['web_url'].split('/')[3], iss['iid'], "E1", "Author cannot close issues")
+        continue
+    
+    # Filter out non-closed issues (shouldn't be any but good to check)
+    
+    # Filter out unwanted users
+    if username is not None and (iss["author"]["username"] != username or iss["closed_by"]["username"] != username):
+        print "# Info: Filtered out : Issue was opened by {0}, and closed by {1}. User {2} was specified as filter".format(iss["author"]["username"], iss["closed_by"]["username"], username)
+        continue
+    
+    # Closed Issues
+    if iss["closed_by"]["username"] not in closed_issues:
+        closed_by_iss = []
+    else:
+        closed_by_iss = closed_issues[iss["closed_by"]["username"]]
+    closed_by_iss.append(iss)
+    closed_issues[iss["closed_by"]["username"]] = closed_by_iss
+
+
 
 print "=== Statistics for GitLab Group '{0}' ====".format(gitlab_group)
 
 print "\n== Merged MR's ==\n"
-
 for key, value in merged_mrs.iteritems():
-    print "{0} - {1}".format(value[0]["author"]["username"], len(value))
+    if human_readable: print "{0} - {1}".format(value[0]["author"]["username"], len(value))
     for mr_value in value:
-        print "   {0} - {1}".format(encode_text(mr_value['web_url'].split('/')[-3]), encode_text(mr_value['title']))
+        if not human_readable:
+            print "Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['author']['username'], 1, mr_value['web_url'].split('/')[3], mr_value['web_url'].split('/')[4], mr_value['web_url'].split('/')[-1]) # 1 point to author for opening a merged MR
+            if is_debug: print "  {0}".format(json.dumps(mr, indent=4, sort_keys=True))
+        else:
+            print "   {0} - {1}".format(encode_text(mr_value['web_url'].split('/')[-1]), encode_text(mr_value['title']))
+
+
+
+print "\n== Reviewed MR's ==\n"
+for key, value in reviewed_mrs.iteritems():
+    if human_readable: print "{0} - {1}".format(value[0]['merged_by']['username'], len(value))
+    for mr_value in value:
+        if not human_readable:
+            print "Reviewed Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['merged_by']['username'], 1, mr_value['web_url'].split('/')[3], mr_value['web_url'].split('/')[4], mr_value['web_url'].split('/')[-1]) # 1 point to reviewer (assuming merged_by is reviewer) for merged MR's
+            if is_debug: print "  {0}".format(json.dumps(mr_value, indent=4, sort_keys=True))
+        else:
+            print "   {0} - {1}".format(encode_text(mr_value['web_url'].split('/')[-1]), encode_text(mr_value['title']))
+
+
+print "\n== Closed Issues ==\n"
+for key, value in closed_issues.iteritems():
+    if human_readable: print "{0} - {1}".format(value[0]['closed_by']['username'], len(value))
+    for iss_value in value:
+        if not human_readable:
+            print "Closed Issues/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(iss_value['id'], iss_value['closed_by']['username'], 1, iss_value['web_url'].split('/')[3], iss_value['web_url'].split('/')[4], iss_value['web_url'].split('/')[-1]) # 1 point person who closes an issue
+            if is_debug: print "  {0}".format(json.dumps(iss_value, indent=4, sort_keys=True))
+        else:
+            print "   {0} - {1}".format(encode_text(iss_value['web_url'].split('/')[-1]), encode_text(iss_value['title']))
+
+
 
