@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-import os, json, requests, sys, argparse
+import os, json, requests, sys, argparse, re
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 # Fill in GitHub Token
 GITHUB_API_TOKEN_NAME = 'GITHUB_API_TOKEN'
-GITHUB_ORG = 'redhat-cop'
+GITHUB_ORG_DEFAULT = 'redhat-cop'
 USER_AGENT= 'redhat-cop-stats'
 DEFAULT_START_DATE_MONTH = '03'
 DEFAULT_START_DATE_DAY = '01'
@@ -44,13 +44,13 @@ def encode_text(text):
 
     return text
 
-def get_org_repos(session):
+def get_org_repos(session, github_org):
     
-    return handle_pagination_items(session, "https://api.github.com/orgs/{0}/repos".format(GITHUB_ORG))
+    return handle_pagination_items(session, "https://api.github.com/orgs/{0}/repos".format(github_org))
 
-def get_org_members(session):
+def get_org_members(session, github_org):
 
-    return handle_pagination_items(session, "https://api.github.com/orgs/{0}/members".format(GITHUB_ORG))
+    return handle_pagination_items(session, "https://api.github.com/orgs/{0}/members".format(github_org))
 
 def get_pr(session, url):
     pr_request = session.get(url)
@@ -64,9 +64,9 @@ def get_reviews(session, url):
 
     return pr_request.json()
 
-def get_org_search_issues(session, start_date):
+def get_org_search_issues(session, start_date, github_org):
 
-    query = "https://api.github.com/search/issues?q=user:{}+updated:>={}+archived:false+state:closed&per_page=50".format(GITHUB_ORG, start_date.date().isoformat())
+    query = "https://api.github.com/search/issues?q=user:{}+updated:>={}+archived:false+state:closed&per_page=50".format(github_org, start_date.date().isoformat())
     return handle_pagination_items(session, query)
 
 def process_labels(labels):
@@ -114,16 +114,31 @@ def show_label(label_items_key, input_labels):
 
     return False
 
+def repo_is_included(issue, repo_matcher, repo_excluder):
+    repo_name = issue['repository_url'].split('/')[-1]
+    repo_name_matches = True if re.match(repo_matcher, repo_name) != None else False
+    repo_name_excluded = True if None != repo_excluder and re.match(repo_excluder, repo_name) != None else False
+    #print "{0} - matches? {1}, excluded? {2}".format(repo_name, repo_name_matches, repo_name_excluded)
+    if repo_name_matches and repo_name_excluded == False:
+        return True
+    return False;
+
 parser = argparse.ArgumentParser(description='Gather GitHub Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-r","--human-readable", action="store_true", help="Human readable format")
 parser.add_argument("-u","--username", help="Username to query")
 parser.add_argument("-l","--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
+parser.add_argument("-o","--organization", help="Organization name", default=GITHUB_ORG_DEFAULT)
+parser.add_argument("-m","--repo-matcher", help="Repo Matcher", default=".+")
+parser.add_argument("-x","--repo-excluder", help="Repo Excluder")
 args = parser.parse_args()
 
 start_date = args.start_date
 username = args.username
 input_labels = args.labels
+repo_matcher = args.repo_matcher
+repo_excluder = args.repo_excluder
+github_org = args.organization
 
 human_readable=(args.human_readable==True)
 
@@ -152,9 +167,12 @@ general_prs = {}
 closed_issues = {}
 reviewed_prs = {}
 
-org_search_issues = get_org_search_issues(session, start_date)
+org_search_issues = get_org_search_issues(session, start_date, github_org)
 
 for issue in org_search_issues:
+
+    if not repo_is_included(issue, repo_matcher, repo_excluder):
+        continue
 
 #    print "{}:".format(issue['id'])
     issue_author_id = issue['user']['id']
@@ -202,7 +220,7 @@ for issue in org_search_issues:
                 
                 label_name = label['name']
 
-                # Determine is Label Exists
+                # Determine if Label Exists
                 if label_name not in general_prs:
                     label_issues = {}
                 else:
@@ -241,7 +259,7 @@ for issue in org_search_issues:
             closed_issue_author.append(issue)
             closed_issues[closed_issue_author_id] = closed_issue_author 
 
-print "=== Statistics for GitHub Organization '{0}' ====".format(GITHUB_ORG)      
+print "=== Statistics for GitHub Organization '{0}' ====".format(github_org)      
 
 
 print "\n== General PR's ==\n"
