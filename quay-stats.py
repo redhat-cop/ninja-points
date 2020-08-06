@@ -5,7 +5,8 @@ import json
 import requests
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 
 QUAY_API_TOKEN_NAME = 'QUAY_API_TOKEN'
 QUAY_ORG_DEFAULT = 'redhat-cop'
@@ -14,7 +15,7 @@ QUAY_HOSTNAME_DEFAULT = 'quay.io'
 
 def valid_date(s):
     try:
-        return datetime.strptime(s, "%Y-%m-%d")
+        return datetime.strptime("{} UTC".format(s), "%Y-%m-%d %Z")
     except ValueError:
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
@@ -50,14 +51,15 @@ def print_repository_statistics(organization, repository, logs):
         country_count = {}
 
         for log in logs:
-            if 'resolved_ip' in log['metadata']:
+            if log['kind'] == 'pull_repo':
+                if 'resolved_ip' in log['metadata']:
 
-                if log['metadata']['resolved_ip']['country_iso_code'] not in country_count:
-                    country_count[log['metadata']
-                                  ['resolved_ip']['country_iso_code']] = 1
-                else:
-                    country_count[log['metadata']['resolved_ip']['country_iso_code']
-                                  ] = int(country_count[log['metadata']['resolved_ip']['country_iso_code']]) + 1
+                    if log['metadata']['resolved_ip']['country_iso_code'] not in country_count:
+                        country_count[log['metadata']
+                                      ['resolved_ip']['country_iso_code']] = 1
+                    else:
+                        country_count[log['metadata']['resolved_ip']['country_iso_code']
+                                      ] = int(country_count[log['metadata']['resolved_ip']['country_iso_code']]) + 1
 
         print("Earliest Record: {}".format(logs[-1]['datetime']))
         print("Most Recent Record: {}".format(logs[0]['datetime']))
@@ -87,8 +89,14 @@ start_date = args.start_date
 organization = args.organization
 quay_host = args.quay
 
+current_date = datetime.utcnow()
+
 if start_date is None:
     start_date = generate_default_date()
+
+if start_date > current_date:
+    print("Start date cannot be greater than current date")
+
 
 quay_api_token = os.environ.get(QUAY_API_TOKEN_NAME)
 
@@ -109,13 +117,21 @@ if len(repositories) > 0:
 
 for repository in repositories:
 
-    params = {
-        "starttime": start_date.strftime("%m/%d/%Y")
-    }
+    logs = []
+    while True:
+        params = {
+            "starttime": start_date.strftime("%m/%d/%Y"),
+            "endtime": start_date.strftime("%m/%d/%Y")
+        }
 
-    url = "https://{}/api/v1/repository/{}/{}/logs".format(
-        quay_host, organization, repository)
+        url = "https://{}/api/v1/repository/{}/{}/logs".format(
+            quay_host, organization, repository)
 
-    logs = get_logs(session, url, params, None)
+        logs.extend(get_logs(session, url, params, None))
+
+        start_date = start_date + timedelta(days=1)
+
+        if start_date > current_date:
+            break
 
     print_repository_statistics(organization, repository, logs)
