@@ -118,10 +118,11 @@ if len(repositories) > 0:
 for repository in repositories:
 
     logs = []
+    current_repository_start_date = start_date
     while True:
         params = {
-            "starttime": start_date.strftime("%m/%d/%Y"),
-            "endtime": start_date.strftime("%m/%d/%Y")
+            "starttime": current_repository_start_date.strftime("%m/%d/%Y"),
+            "endtime": current_repository_start_date.strftime("%m/%d/%Y")
         }
 
         url = "https://{}/api/v1/repository/{}/{}/logs".format(
@@ -129,9 +130,10 @@ for repository in repositories:
 
         logs.extend(get_logs(session, url, params, None))
 
-        start_date = start_date + timedelta(days=1)
+        current_repository_start_date = current_repository_start_date + \
+            timedelta(days=1)
 
-        if start_date > current_date:
+        if current_repository_start_date > current_date:
             break
 
     print_repository_statistics(organization, repository, logs)
