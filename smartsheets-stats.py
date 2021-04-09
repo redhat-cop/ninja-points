@@ -7,8 +7,8 @@ from dateutil.relativedelta import relativedelta
 TOKEN = "7o8djelr503ekzb4phyje3wvoh"
 SHEET_ID = "3510398591756164"
 SHEET_NAME = "*GiveBack Program Data"
-DEFAULT_POINTS_GROUPING = "Completed"
-DEFAULT_POINTS_POOL = "XXX"
+DEFAULT_POINTS_GROUPING = "Cards Closed"
+DEFAULT_POINTS_POOL = "UNKNOWN"
 
 def valid_date(s):
     try:
