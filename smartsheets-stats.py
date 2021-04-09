@@ -61,6 +61,7 @@ for r in sheet.rows:
     jsonData=json.loads(r.to_json())
     row["modifiedAt"]=jsonData["modifiedAt"]
     row["id"]=str(jsonData["id"])
+    row["rowId"]=get_cell_by_column_name(r,"Row ID").value
     row["username"]=get_cell_by_column_name(r,"Created By").value.replace("@redhat.com","")
     row["Community"]=get_cell_by_column_name(r,"Community").value#.replace("-","")
     modAt=datetime.strptime(str(row["modifiedAt"])[:10], "%Y-%m-%d")
@@ -81,7 +82,7 @@ for r in sheet.rows:
 #            pool=row["Community"]
         #print row
         #print "{0}/SS{1}/{2}/{3} [pool={4}, community={5}]".format(points_grouping, row["id"], row["username"],int(row["Points"]),pool,row["Community"])
-        print "{0}/SS{1}/{2}/{3} [pool={4}]".format(points_grouping, row["id"], row["username"],int(row["Points"]),pool)
+        print "{0}/SS{1}/{2}/{3} [pool={4},board=cXCGH32HjPp2mQV3MfxJX4WVVFQ9xJ5J2VCmX8F1,linkId={5}]".format(points_grouping, row["id"], row["username"],int(row["Points"]),pool,row["rowId"])
 
 
 
