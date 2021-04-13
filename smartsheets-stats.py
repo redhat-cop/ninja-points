@@ -76,7 +76,7 @@ for r in sheet.rows:
         if re.search("First and Thirds.*", row["Program Name"]):
             pool="ServicesSupport"
         
-        print "{0}/SS{1}/{2}/{3} [pool={4},board=cXCGH32HjPp2mQV3MfxJX4WVVFQ9xJ5J2VCmX8F1,linkId={5}]".format(points_grouping, row["id"], row["Created By"],int(row["Points"]),pool,row["Row ID"])
+        print "{0}/SS{1}/{2}/{3} [pool={4},board=cXCGH32HjPp2mQV3MfxJX4WVVFQ9xJ5J2VCmX8F1,rowId={5},linkId={6}]".format(points_grouping, row["id"], row["Created By"],int(row["Points"]),pool,row["id"],row["Row ID"])
         
         # outputs Giveback "duplicate records" as output. Used to prevent historical duplicate allocation of points  
         #print "\"SS{0}.{1}\",".format(row["id"],row["Created By"])
