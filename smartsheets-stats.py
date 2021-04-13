@@ -21,12 +21,12 @@ parser = argparse.ArgumentParser(description='Gather Smartsheet Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-g","--points-grouping", help="Points Bucket")
 parser.add_argument("-p","--pool", help="Points Pool")
-parser.add_argument("-c","--community", help="Points Channel")
+parser.add_argument("-c","--channel", help="Points Channel")
 args = parser.parse_args()
-start_date = args.start_date#datetime.strptime(args.start_date, "%Y-%m-%d")
+start_date = args.start_date
 points_grouping = args.points_grouping
 points_pool = args.pool
-community = args.community
+channel = args.channel
 
 if start_date is None:
     print "Error: Please provide a start date!"
@@ -44,7 +44,6 @@ ss = smartsheet.Smartsheet(TOKEN)
 ss.errors_as_exceptions(True)
 sheet = ss.Sheets.get_sheet(SHEET_ID)
 
-# build a column map for later use
 column_map={}
 for column in sheet.columns:
     column_map[column.title] = column.id
@@ -55,35 +54,32 @@ def get_cell_by_column_name(row, column_name):
     return row.get_column(column_id)
 
 
-fields=["Created By","Date","Status","Points"]
+fields=["Row ID","Program Name","Points","Created By"]
 for r in sheet.rows:
     row={}
     jsonData=json.loads(r.to_json())
     row["modifiedAt"]=jsonData["modifiedAt"]
     row["id"]=str(jsonData["id"])
-    row["rowId"]=get_cell_by_column_name(r,"Row ID").value
-    row["username"]=get_cell_by_column_name(r,"Created By").value.replace("@redhat.com","")
-    row["Community"]=get_cell_by_column_name(r,"Community").value#.replace("-","")
-    modAt=datetime.strptime(str(row["modifiedAt"])[:10], "%Y-%m-%d")
+    modifiedAt=datetime.strptime(str(row["modifiedAt"])[:10], "%Y-%m-%d")
     status=get_cell_by_column_name(r,"Status").value
 
-    if modAt >= start_date and status=="Approved" and (community is None or (community!=None and re.search(community, row["Community"])!=None)):
+    if modifiedAt >= start_date and status=="Approved" and (channel is None or (channel!=None and re.search(channel, row["Program Name"])!=None)):
         for field in fields:
             row[field]=get_cell_by_column_name(r,field).value
-        if re.search("Thought Leadership.*", row["Community"]):
+        row["Created By"]=row["Created By"].replace("@redhat.com","")
+        if re.search("Thought Leadership.*", row["Program Name"]):
             pool="ThoughtLeadership"
-        if re.search("Community.*", row["Community"]):
+        if re.search("Community.*", row["Program Name"]):
             pool="ThoughtLeadership"
-        if re.search("Adopt.*", row["Community"]):
+        if re.search("Adopt.*", row["Program Name"]):
             pool="ServicesSupport"
-        if re.search("First and Thirds.*", row["Community"]):
+        if re.search("First and Thirds.*", row["Program Name"]):
             pool="ServicesSupport"
-#        if pool is None:
-#            pool=row["Community"]
-        #print row
-        #print "{0}/SS{1}/{2}/{3} [pool={4}, community={5}]".format(points_grouping, row["id"], row["username"],int(row["Points"]),pool,row["Community"])
-        print "{0}/SS{1}/{2}/{3} [pool={4},board=cXCGH32HjPp2mQV3MfxJX4WVVFQ9xJ5J2VCmX8F1,linkId={5}]".format(points_grouping, row["id"], row["username"],int(row["Points"]),pool,row["rowId"])
-
+        
+        print "{0}/SS{1}/{2}/{3} [pool={4},board=cXCGH32HjPp2mQV3MfxJX4WVVFQ9xJ5J2VCmX8F1,linkId={5}]".format(points_grouping, row["id"], row["Created By"],int(row["Points"]),pool,row["Row ID"])
+        
+        # outputs Giveback "duplicate records" as output. Used to prevent historical duplicate allocation of points  
+        #print "\"SS{0}.{1}\",".format(row["id"],row["Created By"])
 
 
 
