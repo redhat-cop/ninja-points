@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import smartsheet,json,argparse,sys,re
+import smartsheet,json,argparse,sys,re,os
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-TOKEN = "7o8djelr503ekzb4phyje3wvoh"
+API_TOKEN_NAME = 'SMARTSHEETS_API_TOKEN'
 SHEET_ID = "3510398591756164"
 SHEET_NAME = "*GiveBack Program Data"
 DEFAULT_POINTS_GROUPING = "Cards Closed"
@@ -38,9 +38,16 @@ if points_pool is None:
 if points_grouping is None:
     points_grouping = DEFAULT_POINTS_GROUPING
 
+
+api_token = os.environ.get(API_TOKEN_NAME)
+if not api_token:
+    print "Error: Smartsheets API Key is Required!"
+    sys.exit(1)
+
+
 today_date = datetime.now()
 
-ss = smartsheet.Smartsheet(TOKEN)
+ss = smartsheet.Smartsheet(api_token)
 ss.errors_as_exceptions(True)
 sheet = ss.Sheets.get_sheet(SHEET_ID)
 
