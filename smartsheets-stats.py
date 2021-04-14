@@ -5,10 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 API_TOKEN_NAME = 'SMARTSHEETS_API_TOKEN'
-SHEET_ID = "3510398591756164"
-SHEET_NAME = "*GiveBack Program Data"
 DEFAULT_POINTS_GROUPING = "Cards Closed"
-DEFAULT_POINTS_POOL = "UNKNOWN"
 
 def valid_date(s):
     try:
@@ -19,21 +16,28 @@ def valid_date(s):
 
 parser = argparse.ArgumentParser(description='Gather Smartsheet Statistics.')
 parser.add_argument("-s","--start-date", help="The start date to query from", type=valid_date)
-parser.add_argument("-g","--points-grouping", help="Points Bucket")
-parser.add_argument("-p","--pool", help="Points Pool")
+parser.add_argument("-e","--sheet-id", help="The smartsheets sheet id to pull data from")
+parser.add_argument("-g","--points-grouping", help="Points grouping (ie. Cards Closed)")
+parser.add_argument("-b","--board-id", help="Link back to the original smartsheet")
 parser.add_argument("-c","--channel", help="Points Channel")
 args = parser.parse_args()
 start_date = args.start_date
 points_grouping = args.points_grouping
-points_pool = args.pool
 channel = args.channel
+sheet_id = args.sheet_id
+board_id = args.board_id
 
 if start_date is None:
     print "Error: Please provide a start date!"
     sys.exit(1)
 
-if points_pool is None:
-    points_pool = DEFAULT_POINTS_POOL
+if sheet_id is None:
+    print "Error: Smartsheets sheet ID must be provided!"
+    sys.exit(1)
+
+if board_id is None:
+    print "Error: Smartsheets board ID must be provided in order to build a like back to the origin of the points!"
+    sys.exit(1)
 
 if points_grouping is None:
     points_grouping = DEFAULT_POINTS_GROUPING
@@ -49,7 +53,7 @@ today_date = datetime.now()
 
 ss = smartsheet.Smartsheet(api_token)
 ss.errors_as_exceptions(True)
-sheet = ss.Sheets.get_sheet(SHEET_ID)
+sheet = ss.Sheets.get_sheet(sheet_id)
 
 column_map={}
 for column in sheet.columns:
@@ -83,7 +87,7 @@ for r in sheet.rows:
         if re.search("First and Thirds.*", row["Program Name"]):
             pool="ServicesSupport"
         
-        print "{0}/SS{1}/{2}/{3} [pool={4},board=cXCGH32HjPp2mQV3MfxJX4WVVFQ9xJ5J2VCmX8F1,rowId={5},linkId={6}]".format(points_grouping, row["id"], row["Created By"],int(row["Points"]),pool,row["id"],row["Row ID"])
+        print "{0}/SS{1}/{2}/{3} [pool={4},board={5},rowId={6},linkId={7}]".format(points_grouping, row["id"], row["Created By"],int(row["Points"]),pool,board_id,row["id"],row["Row ID"])
         
         # outputs Giveback "duplicate records" as output. Used to prevent historical duplicate allocation of points  
         #print "\"SS{0}.{1}\",".format(row["id"],row["Created By"])
