@@ -65,7 +65,7 @@ def get_cell_by_column_name(row, column_name):
     return row.get_column(column_id)
 
 
-fields=["Row ID","Program Name","Points","Created By"]
+fields=["Row ID","eMail","Program Name","Points","Created By"]
 for r in sheet.rows:
     row={}
     jsonData=json.loads(r.to_json())
@@ -77,7 +77,11 @@ for r in sheet.rows:
     if modifiedAt >= start_date and status=="Approved" and (channel is None or (channel!=None and re.search(channel, row["Program Name"])!=None)):
         for field in fields:
             row[field]=get_cell_by_column_name(r,field).value
-        row["Created By"]=row["Created By"].replace("@redhat.com","")
+        
+        # Points recipient is "Created By" (when someone opens the ticket themselves), otherwise use "eMail" (when someone opens ticket for someone else)
+        recipient = row["eMail"] if row["eMail"] is not None else row["Created By"]
+        recipient = recipient.replace("@redhat.com","")
+        
         if re.search("Thought Leadership.*", row["Program Name"]):
             pool="ThoughtLeadership"
         if re.search("Community.*", row["Program Name"]):
@@ -87,10 +91,10 @@ for r in sheet.rows:
         if re.search("First and Thirds.*", row["Program Name"]):
             pool="ServicesSupport"
         
-        print "{0}/SS{1}/{2}/{3} [pool={4},board={5},rowId={6},linkId={7}]".format(points_grouping, row["id"], row["Created By"],int(row["Points"]),pool,board_id,row["id"],row["Row ID"])
+        print "{0}/SS{1}/{2}/{3} [pool={4},board={5},rowId={6},linkId={7}]".format(points_grouping, row["id"], recipient,int(row["Points"]),pool,board_id,row["id"],row["Row ID"])
         
         # outputs Giveback "duplicate records" as output. Used to prevent historical duplicate allocation of points  
-        #print "\"SS{0}.{1}\",".format(row["id"],row["Created By"])
+        #print "\"SS{0}.{1}\",".format(row["id"],recipient)
 
 
 
