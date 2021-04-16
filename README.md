@@ -186,6 +186,7 @@ export GITLAB_API_TOKEN='<API_KEY>'
 
 Execute the script:
 
+```
 $ ./gitlab-stats.py
 
 === Statistics for GitLab Group 'redhat-cop' ====
@@ -215,6 +216,7 @@ $ ./hangouts-chat.py"
 
 - containers - 55 Members
 - openshift-development - 311 Members
+```
 
 ## Mailman
 
@@ -224,9 +226,42 @@ A script called [mailman-subscribers.py](mailman-subscribers.py) is available to
 
 Execute the script:
 
+```
 $ ./mailman-subscribers [ options ] hostname listname password
 
 ashore@redhat.com
 csmart@redhat.com
 mmurray@redhat.com
+```
+
+## Quay Registry Statistics
+
+### Script
+
+A script called [quay-stats.py](quay-stats.py) is available to query statistics from [Quay](https://quay.io).
+
+The Quay API can be queried using an Application OAuth Access token. Refer to the [Quay documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3/html/red_hat_quay_api_guide/using_the_red_hat_quay_api) on the steps necessary to generate a token.
+
+Configure the required environment variable:
+
+```
+export QUAY_API_TOKEN=`<QUAY_OAUTH_ACCESS_TOKEN>`
+```
+Execute the script:
+
+```
+$ ./quay-stats.py -r group-sync-operator
+=== Statistics for Quay Organization 'redhat-cop' ====
+
+- Repository 'group-sync-operator' -
+
+Earliest Record: Mon, 27 Jul 2020 05:15:22 -0000
+Most Recent Record: Mon, 27 Jul 2020 20:30:07 -0000
+
+Country Counts:
+DE - 3
+ES - 2
+US - 1
+FR - 2
+AU - 4
 ```
