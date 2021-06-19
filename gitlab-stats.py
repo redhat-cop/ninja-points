@@ -68,13 +68,10 @@ def handle_pagination_items(session, url):
 
 
 def get_projects_for_group(session, server, group_id):
-    group_projects = session.get("{0}/api/v4/groups/{1}/projects?include_subgroups=true".format(server, group_id))
-    group_projects.raise_for_status()
-    return group_projects.json()
+    return handle_pagination_items(session, "{0}/api/v4/groups/{1}/projects?include_subgroups=true".format(server, group_id))
 
 
 def get_group_with_projects(session, server, group_name, repo_matcher):
-    #groups = handle_pagination_items(session, "{0}/api/v4/groups?search={1}".format(server,group_name))
     groups = session.get("{0}/api/v4/groups/{1}".format(server, group_name))
     global req_group
     req_group += 1
