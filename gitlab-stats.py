@@ -7,6 +7,7 @@ import sys
 import pytz
 import argparse
 import dateutil.parser
+import urllib
 import re
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -72,7 +73,7 @@ def get_projects_for_group(session, server, group_id):
 
 
 def get_group_with_projects(session, server, group_name, repo_matcher):
-    groups = session.get("{0}/api/v4/groups/{1}".format(server, group_name))
+    groups = session.get("{0}/api/v4/groups/{1}".format(server, urllib.quote(group_name, safe='')))
     global req_group
     req_group += 1
     groups.raise_for_status()
