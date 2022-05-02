@@ -7,6 +7,7 @@ import sys
 import pytz
 import argparse
 import dateutil.parser
+import urllib
 import re
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -72,7 +73,7 @@ def get_projects_for_group(session, server, group_id):
 
 
 def get_group_with_projects(session, server, group_name, repo_matcher):
-    groups = session.get("{0}/api/v4/groups/{1}".format(server, group_name))
+    groups = session.get("{0}/api/v4/groups/{1}".format(server, urllib.quote(group_name, safe='')))
     global req_group
     req_group += 1
     groups.raise_for_status()
@@ -242,7 +243,7 @@ for key, value in merged_mrs.iteritems():
     for mr_value in value:
         if not human_readable:
             # 1 point to author for opening a merged MR
-            print "Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['author']['username'], 1, mr_value['web_url'].split('/')[3], mr_value['web_url'].split('/')[4], mr_value['web_url'].split('/')[-1])
+            print "Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['author']['username'], 1, mr_value['web_url'].split('/')[3], '/'.join(mr_value['web_url'].split('/')[4:(len(mr_value['web_url'].split('/'))-3)]), mr_value['web_url'].split('/')[-1])
             if is_debug:
                 print "  {0}".format(json.dumps(mr, indent=4, sort_keys=True))
         else:
@@ -256,7 +257,7 @@ for key, value in reviewed_mrs.iteritems():
     for mr_value in value:
         if not human_readable:
             # 1 point to reviewer (assuming merged_by is reviewer) for merged MR's
-            print "Reviewed Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['merged_by']['username'], 1, mr_value['web_url'].split('/')[3], mr_value['web_url'].split('/')[4], mr_value['web_url'].split('/')[-1])
+            print "Reviewed Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['merged_by']['username'], 1, mr_value['web_url'].split('/')[3], '/'.join(mr_value['web_url'].split('/')[4:(len(mr_value['web_url'].split('/'))-3)]), mr_value['web_url'].split('/')[-1])
             if is_debug:
                 print "  {0}".format(json.dumps(mr_value, indent=4, sort_keys=True))
         else:
@@ -270,7 +271,7 @@ for key, value in closed_issues.iteritems():
     for iss_value in value:
         if not human_readable:
             # 1 point person who closes an issue
-            print "Closed Issues/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(iss_value['id'], iss_value['closed_by']['username'], 1, iss_value['web_url'].split('/')[3], iss_value['web_url'].split('/')[4], iss_value['web_url'].split('/')[-1])
+            print "Closed Issues/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(iss_value['id'], iss_value['closed_by']['username'], 1, iss_value['web_url'].split('/')[3], '/'.join(iss_value['web_url'].split('/')[4:(len(iss_value['web_url'].split('/'))-3)]), iss_value['web_url'].split('/')[-1])
             if is_debug:
                 print "  {0}".format(json.dumps(iss_value, indent=4, sort_keys=True))
         else:
