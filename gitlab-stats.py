@@ -78,11 +78,12 @@ def get_group_with_projects(session, server, group_name, repo_matcher):
     req_group += 1
     groups.raise_for_status()
     result = groups.json()
-
     group_projects = get_projects_for_group(session, server, result["id"])
 
     for project in reversed(group_projects):
-        regex_filter_out = re.match(repo_matcher, project["name"]) == None
+        regex_filter_out = re.match(repo_matcher, project["path_with_namespace"]) == None
+        if not regex_filter_out and is_debug:
+            print "DEBUG:: Including group - {0}".format(project["path_with_namespace"])
         if regex_filter_out:
             group_projects.remove(project)
 
