@@ -25,8 +25,6 @@ closed_issues = {}
 reviewed_mrs = {}
 project_cache = {}
 
-req_group = 0
-req_pagination = 0
 is_debug = False
 
 
@@ -60,8 +58,6 @@ def handle_pagination_items(session, url):
         print "DEBUG:: handle_pagination_items(): url = {0}".format(url)
     pagination_request = session.get(url)
     pagination_request.raise_for_status()
-    global req_pagination
-    req_pagination += 1
 
     if 'next' in pagination_request.headers["Link"] and pagination_request.links['next']:
         return pagination_request.json() + handle_pagination_items(session, pagination_request.links['next']['url'])
@@ -71,8 +67,6 @@ def handle_pagination_items(session, url):
 def get_group(session, server, group_name):
     group = session.get("{0}/api/v4/groups/{1}".format(server, urllib.quote(group_name, safe='')))
     global req_group
-    req_group += 1
-    group.raise_for_status()
     result = group.json()
 
     if is_debug:
@@ -151,7 +145,6 @@ parser.add_argument("-l", "--labels", help="Comma separated list to display. Add
 parser.add_argument("-r", "--human-readable", action="store_true", help="Human readable display")
 parser.add_argument("-o", "--organization", help="Organization name", default=GITLAB_GROUP_DEFAULT)
 parser.add_argument("-m", "--repo-matcher", help="Repo Matcher", default=".+")
-#parser.add_argument("-x","--repo-excluder", help="Repo Excluder")
 args = parser.parse_args()
 
 start_date = args.start_date
@@ -160,8 +153,6 @@ input_labels = args.labels
 human_readable=(args.human_readable==True)
 gitlab_group = args.organization
 repo_matcher = re.compile(args.repo_matcher)
-#repo_excluder = args.repo_excluder
-repo_excluder = None  # this has been broken for now due to method "get_group_with_projects" but isn't used anyway
 
 if start_date is None:
     start_date = generate_start_date()
