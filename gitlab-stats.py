@@ -23,6 +23,7 @@ DEFAULT_START_DATE_DAY = '01'
 merged_mrs = {}
 closed_issues = {}
 reviewed_mrs = {}
+project_cache = {}
 
 req_group = 0
 req_pagination = 0
@@ -67,64 +68,80 @@ def handle_pagination_items(session, url):
     else:
         return pagination_request.json()
 
-
-def get_projects_for_group(session, server, group_id):
-    return handle_pagination_items(session, "{0}/api/v4/groups/{1}/projects?include_subgroups=true".format(server, group_id))
-
-
-def get_group_with_projects(session, server, group_name, repo_matcher):
-    groups = session.get("{0}/api/v4/groups/{1}".format(server, urllib.quote(group_name, safe='')))
+def get_group(session, server, group_name):
+    group = session.get("{0}/api/v4/groups/{1}".format(server, urllib.quote(group_name, safe='')))
     global req_group
     req_group += 1
-    groups.raise_for_status()
-    result = groups.json()
-    group_projects = get_projects_for_group(session, server, result["id"])
-
-    for project in reversed(group_projects):
-        regex_filter_out = re.match(repo_matcher, project["path_with_namespace"]) == None
-        if not regex_filter_out and is_debug:
-            print "DEBUG:: Including group - {0}".format(project["path_with_namespace"])
-        if regex_filter_out:
-            group_projects.remove(project)
-
-    result["projects"] = group_projects
+    group.raise_for_status()
+    result = group.json()
 
     if is_debug:
+        print "DEBUG:: Group Data"
         print "  {0}".format(json.dumps(result, indent=4, sort_keys=True))
 
     return result
 
-def get_group_project_data(data_type, session, group, start_date):
-    query_result = []
-
-    for project in group["projects"]:
-        base_url = ""
+def get_project(session, project_id):
+    if project_id not in project_cache:
+        project_request = session.get("{0}/api/v4/projects/{1}".format(gitlab_server, project_id))
+        project_request.raise_for_status()
+        project_cache[project_id]=project_request.json()
 
         if is_debug:
-            print "DEBUG:: Getting project data for: {}".format(project["path_with_namespace"])
+            print "DEBUG:: Added project data to cache"
+            print "  {0}".format(json.dumps(project_cache[project_id], indent=4, sort_keys=True))
+    else:
+        project_cache.get(project_id)
 
-        try:
-            base_url = project["_links"][data_type]
-        except KeyError:
-            continue
+    return project_cache[project_id]
 
-        query_state = "&state="
-        if data_type == "issues":
-            query_state += "closed"
-        elif data_type == "merge_requests":
-            query_state += "merged"
-        else:
-            query_state = ""
+def is_data_item_allowed(item, group, session, repo_matcher):
+    include_item = False
 
-        query_date = "&updated_after={0}".format(start_date.strftime("%Y-%m-%d"))
+    project = get_project(session, item["project_id"])
+    project_is_org_child = re.match("^{0}\/".format(group["path"]), project["path_with_namespace"]) != None
+    item_matches = re.match(repo_matcher, project["path_with_namespace"]) != None
 
-        query_string = "?scope=all&per_page=1000{0}{1}".format(query_state, query_date)
+    if project_is_org_child and item_matches:
+        if is_debug:
+            print "DEBUG:: Including item - {0}".format(item["references"]["full"])
+        include_item = True
 
-        query_result.extend(handle_pagination_items(session, base_url+query_string))
+    return include_item
+
+def get_group_project_data(data_type, session, server, group, start_date, repo_matcher):
+    allowed_data = []
+
+    base_url = "{0}/api/v4/groups/{1}/{2}".format(server, group["id"], data_type)
 
     if is_debug:
-        print "DEBUG:: QUERY_RESULT - {0}\n{1}".format(data_type, json.dumps(query_result, indent=4))
-    return query_result
+        print "DEBUG:: Getting {0} group {1}".format(group["path"], data_type)
+
+    query_state = "&state="
+    if data_type == "issues":
+        query_state += "closed"
+    elif data_type == "merge_requests":
+        query_state += "merged"
+    else:
+        query_state = ""
+
+    query_date = "&updated_after={0}".format(start_date.strftime("%Y-%m-%d"))
+
+    query_string = "?scope=all&per_page=1000{0}{1}".format(query_state, query_date)
+
+    if is_debug:
+        print "DEBUG:: Query URL: {0}".format(base_url+query_string)
+
+    query_result = handle_pagination_items(session, base_url+query_string)
+
+    for item in query_result:
+        if is_data_item_allowed(item, group, session, repo_matcher):
+            allowed_data.append(item)
+
+    if is_debug:
+        print "DEBUG:: ALLOWED_DATA - {0}\n{1}".format(data_type, json.dumps(allowed_data, indent=4, sort_keys=True))
+
+    return allowed_data
 
 
 parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
@@ -142,7 +159,7 @@ username = args.username
 input_labels = args.labels
 human_readable=(args.human_readable==True)
 gitlab_group = args.organization
-repo_matcher = args.repo_matcher
+repo_matcher = re.compile(args.repo_matcher)
 #repo_excluder = args.repo_excluder
 repo_excluder = None  # this has been broken for now due to method "get_group_with_projects" but isn't used anyway
 
@@ -163,14 +180,14 @@ session.headers = {
 }
 
 
-group = get_group_with_projects(session, gitlab_server, gitlab_group, repo_matcher)
+group = get_group(session, gitlab_server, gitlab_group)
 
 if group is None:
     print "Unable to Locate Group!"
     sys.exit(1)
 
 
-group_merge_requests = get_group_project_data('merge_requests', session, group, start_date)
+group_merge_requests = get_group_project_data('merge_requests', session, gitlab_server, group, start_date, repo_matcher)
 
 for mr in group_merge_requests:
     # Skip items that do not have a valid merged_at datetime
@@ -210,7 +227,7 @@ for mr in group_merge_requests:
     reviewed_mrs[mr["merged_by"]["username"]] = reviewer_mrs
 
 
-group_issues = get_group_project_data('issues', session, group, start_date)
+group_issues = get_group_project_data('issues', session, gitlab_server, group, start_date, repo_matcher)
 
 for iss in group_issues:
     # Skip items that do not have a valid merged_at datetime
