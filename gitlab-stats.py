@@ -116,7 +116,7 @@ def get_group_project_data(data_type, session, group, start_date):
         else:
             query_state = ""
 
-        query_date = "&created_after={0}".format(start_date.strftime("%Y-%m-%d"))
+        query_date = "&updated_after={0}".format(start_date.strftime("%Y-%m-%d"))
 
         query_string = "?scope=all&per_page=1000{0}{1}".format(query_state, query_date)
 
@@ -173,17 +173,16 @@ if group is None:
 group_merge_requests = get_group_project_data('merge_requests', session, group, start_date)
 
 for mr in group_merge_requests:
-    # Skip items that do not have a valid updated_at datetime
-    if dateutil.parser.parse(mr["updated_at"]) < start_date:
-        if is_debug:
-            print "DEBUG:: Omit {0} MR {1} {2}/{3}".format(mr["state"], mr["updated_at"], mr['id'], mr['title'])
-        continue
-    if is_debug:
-        print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(mr["state"], mr["updated_at"], mr['id'], mr['title'])
-
-    # Check if MR has been merged
+    # Skip items that do not have a valid merged_at datetime
     if not mr['merged_at']:
         continue
+
+    if dateutil.parser.parse(mr["merged_at"]) < start_date:
+        if is_debug:
+            print "DEBUG:: Omit {0} MR {1} {2}/{3}".format(mr["state"], mr["merged_at"], mr['id'], mr['title'])
+        continue
+    if is_debug:
+        print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(mr["state"], mr["merged_at"], mr['id'], mr['title'])
 
     # Filter out unwanted mr users (if username is specified, then we're only interested in MRs that have that user either the author or merger)
     if username is not None and (mr["author"]["username"] != username or mr["merged_by"]["username"] != username):
@@ -214,12 +213,16 @@ for mr in group_merge_requests:
 group_issues = get_group_project_data('issues', session, group, start_date)
 
 for iss in group_issues:
-    if dateutil.parser.parse(iss["updated_at"]) < start_date:
+    # Skip items that do not have a valid merged_at datetime
+    if not iss['closed_at']:
+        continue
+
+    if dateutil.parser.parse(iss["closed_at"]) < start_date:
         if is_debug:
-            print "DEBUG:: Omit {0} Issue {1} {2}/{3} (shortId={4})".format(iss["state"], iss["updated_at"], iss['id'], iss['title'], iss['iid'])
+            print "DEBUG:: Omit {0} Issue {1} {2}/{3} (shortId={4})".format(iss["state"], iss["closed_at"], iss['id'], iss['title'], iss['iid'])
         continue
     if is_debug:
-        print "DEBUG:: Incl {0} Issue {1} {2}/{3} (shortId={4})".format(iss["state"], iss["updated_at"], iss['id'], iss['title'], iss['iid'])
+        print "DEBUG:: Incl {0} Issue {1} {2}/{3} (shortId={4})".format(iss["state"], iss["closed_at"], iss['id'], iss['title'], iss['iid'])
 
     # Filter out if closed_by == author
     if iss["author"]["username"] == iss["closed_by"]["username"]:
