@@ -125,7 +125,7 @@ parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
 parser.add_argument("-s", "--start-date", help="The start date to query from", type=valid_date)
 parser.add_argument("-u", "--username", help="Username to query")
 parser.add_argument("-l", "--labels", help="Comma separated list to display. Add '-' at end of each label to negate")
-parser.add_argument("-r", "--human-readable", help="Human readable display")
+parser.add_argument("-r", "--human-readable", action="store_true", help="Human readable display")
 parser.add_argument("-o", "--organization", help="Organization name", default=GITLAB_GROUP_DEFAULT)
 parser.add_argument("-m", "--repo-matcher", help="Repo Matcher", default=".+")
 #parser.add_argument("-x","--repo-excluder", help="Repo Excluder")
@@ -134,7 +134,7 @@ args = parser.parse_args()
 start_date = args.start_date
 username = args.username
 input_labels = args.labels
-human_readable = args.human_readable is not None
+human_readable=(args.human_readable==True)
 gitlab_group = args.organization
 repo_matcher = args.repo_matcher
 #repo_excluder = args.repo_excluder
