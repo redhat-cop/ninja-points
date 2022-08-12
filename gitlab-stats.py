@@ -89,36 +89,42 @@ def get_group_with_projects(session, server, group_name, repo_matcher):
 
     result["projects"] = group_projects
 
+    if is_debug:
+        print "  {0}".format(json.dumps(result, indent=4, sort_keys=True))
+
     return result
 
+def get_group_project_data(data_type, session, group, start_date):
+    query_result = []
 
-def is_merge_request_in_project_group(merge_request, group, repo_matcher, repo_excluder):
     for project in group["projects"]:
-        repo_name_matches = True if re.match(repo_matcher, project["name"]) != None else False
-        repo_name_excluded = True if None != repo_excluder and re.match(repo_excluder, project["name"]) != None else False
-        if repo_name_matches and repo_name_excluded == False and (project["id"] == merge_request["target_project_id"]):
-            return True
+        base_url = ""
 
-    return False
+        if is_debug:
+            print "DEBUG:: Getting project data for: {}".format(project["path_with_namespace"])
 
+        try:
+            base_url = project["_links"][data_type]
+        except KeyError:
+            continue
 
-def get_group_merge_requests(session, server, group, repo_matcher, repo_excluder, start_date):
-    all_merge_requests = handle_pagination_items(
-        session, "{0}/api/v4/groups/{1}/merge_requests?state=merged&scope=all&per_page=1000&created_after={2}".format(server, group["id"], start_date.strftime("%Y-%m-%d")))
-    return [item for item in all_merge_requests if is_merge_request_in_project_group(item, group, repo_matcher, repo_excluder)]
+        query_state = "&state="
+        if data_type == "issues":
+            query_state += "closed"
+        elif data_type == "merge_requests":
+            query_state += "merged"
+        else:
+            query_state = ""
 
+        query_date = "&created_after={0}".format(start_date.strftime("%Y-%m-%d"))
 
-def is_issue_in_project_group(issue, group, repo_matcher, repo_excluder):
-    for project in group["projects"]:
-        if project["id"] == issue["project_id"]:
-            return True
-    return False
+        query_string = "?scope=all&per_page=1000{0}{1}".format(query_state, query_date)
 
+        query_result.extend(handle_pagination_items(session, base_url+query_string))
 
-def get_group_issues(session, server, group, repo_matcher, repo_excluder, start_date):
-    all_issues = handle_pagination_items(
-        session, "{0}/api/v4/groups/{1}/issues?state=closed&scope=all&per_page=1000&created_after={2}".format(server, group["id"], start_date.strftime("%Y-%m-%d")))
-    return [item for item in all_issues if is_issue_in_project_group(item, group, repo_matcher, repo_excluder)]
+    if is_debug:
+        print "DEBUG:: QUERY_RESULT - {0}\n{1}".format(data_type, json.dumps(query_result, indent=4))
+    return query_result
 
 
 parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
@@ -164,7 +170,8 @@ if group is None:
     sys.exit(1)
 
 
-group_merge_requests = get_group_merge_requests(session, gitlab_server, group, repo_matcher, repo_excluder, start_date)
+group_merge_requests = get_group_project_data('merge_requests', session, group, start_date)
+
 for mr in group_merge_requests:
     # Skip items that do not have a valid updated_at datetime
     if dateutil.parser.parse(mr["updated_at"]) < start_date:
@@ -204,7 +211,8 @@ for mr in group_merge_requests:
     reviewed_mrs[mr["merged_by"]["username"]] = reviewer_mrs
 
 
-group_issues = get_group_issues(session, gitlab_server, group, repo_matcher, repo_excluder, start_date)
+group_issues = get_group_project_data('issues', session, group, start_date)
+
 for iss in group_issues:
     if dateutil.parser.parse(iss["updated_at"]) < start_date:
         if is_debug:
