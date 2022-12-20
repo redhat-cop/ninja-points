@@ -59,7 +59,7 @@ def handle_pagination_items(session, url):
     pagination_request = session.get(url)
     pagination_request.raise_for_status()
 
-    if 'next' in pagination_request.headers["Link"] and pagination_request.links['next']:
+    if 'link' in pagination_request.headers and 'next' in pagination_request.headers["Link"] and pagination_request.links['next']:
         return pagination_request.json() + handle_pagination_items(session, pagination_request.links['next']['url'])
     else:
         return pagination_request.json()
@@ -137,6 +137,22 @@ def get_group_project_data(data_type, session, server, group, start_date, repo_m
 
     return allowed_data
 
+# Determine if merge request is approved. Must be approved by at least 1 user who is not the merge request author
+def is_merge_request_approved(session, merge_request):
+
+    url = "{0}/api/v4/projects/{1}/merge_requests/{2}/approvals".format(gitlab_server, merge_request["project_id"], merge_request["iid"])
+
+    if is_debug:
+        print "DEBUG:: Getting project {0} merge_request {1} approval".format(merge_request["project_id"], merge_request["iid"])
+
+    query_result = handle_pagination_items(session, url)
+
+    if 'approved_by' in query_result:
+        for approval in query_result["approved_by"]:
+            if 'user' in approval:
+                if merge_request["author"]["id"] != approval["user"]["id"]:
+                    return True
+    return False
 
 parser = argparse.ArgumentParser(description='Gather GitLab Statistics.')
 parser.add_argument("-s", "--start-date", help="The start date to query from", type=valid_date)
@@ -193,12 +209,12 @@ for mr in group_merge_requests:
         print "DEBUG:: Incl {0} MR {1} {2}/{3}".format(mr["state"], mr["merged_at"], mr['id'], mr['title'])
 
     # Filter out unwanted mr users (if username is specified, then we're only interested in MRs that have that user either the author or merger)
-    if username is not None and (mr["author"]["username"] != username or mr["merged_by"]["username"] != username):
+    if username is not None and (mr["author"]["username"] != username or mr["merge_user"]["username"] != username):
         continue
 
-    # Filter out if merged == author
-    if mr["author"]["username"] == mr["merged_by"]["username"]:
-        print "# Error: Author==Merged_by {0} {1} {2}".format(mr['id'], mr["author"]["username"], mr['title'])
+    # Filter out if merged == author if approver != author
+    if mr["author"]["username"] == mr["merge_user"]["username"] and not is_merge_request_approved(session, mr):
+        print "# Error: Author==merge_user {0} {1} {2}".format(mr['id'], mr["author"]["username"], mr['title'])
         continue
 
     # Merged MRs
@@ -209,13 +225,13 @@ for mr in group_merge_requests:
     author_mrs.append(mr)
     merged_mrs[mr["author"]["username"]] = author_mrs
 
-    # Reviewed MRs (assuming merged_by user is the reviewer, since GL doesn't have an "approve" feature in community edition)
-    if mr["merged_by"]["username"] not in reviewed_mrs:
+    # Reviewed MRs (assuming merge_user user is the reviewer, since GL doesn't have an "approve" feature in community edition)
+    if mr["merge_user"]["username"] not in reviewed_mrs:
         reviewer_mrs = []
     else:
-        reviewer_mrs = reviewed_mrs[mr["merged_by"]["username"]]
+        reviewer_mrs = reviewed_mrs[mr["merge_user"]["username"]]
     reviewer_mrs.append(mr)
-    reviewed_mrs[mr["merged_by"]["username"]] = reviewer_mrs
+    reviewed_mrs[mr["merge_user"]["username"]] = reviewer_mrs
 
 
 group_issues = get_group_project_data('issues', session, gitlab_server, group, start_date, repo_matcher)
@@ -273,11 +289,11 @@ for key, value in merged_mrs.iteritems():
 print "\n== Reviewed MR's ==\n"
 for key, value in reviewed_mrs.iteritems():
     if human_readable:
-        print "{0} - {1}".format(value[0]['merged_by']['username'], len(value))
+        print "{0} - {1}".format(value[0]['merge_user']['username'], len(value))
     for mr_value in value:
         if not human_readable:
-            # 1 point to reviewer (assuming merged_by is reviewer) for merged MR's
-            print "Reviewed Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['merged_by']['username'], 1, mr_value['web_url'].split('/')[3], '/'.join(mr_value['web_url'].split('/')[4:(len(mr_value['web_url'].split('/'))-3)]), mr_value['web_url'].split('/')[-1])
+            # 1 point to reviewer (assuming merge_user is reviewer) for merged MR's
+            print "Reviewed Merge Requests/GL{0}/{1}/{2} [org={3}, board={4}, linkId={5}]".format(mr_value['id'], mr_value['merge_user']['username'], 1, mr_value['web_url'].split('/')[3], '/'.join(mr_value['web_url'].split('/')[4:(len(mr_value['web_url'].split('/'))-3)]), mr_value['web_url'].split('/')[-1])
             if is_debug:
                 print "  {0}".format(json.dumps(mr_value, indent=4, sort_keys=True))
         else:
