@@ -112,7 +112,7 @@ http://help.trello.com/article/808-searching-for-cards-all-boards
 
 ### Script
 
-A script called [gitlab-stats.py](gitlab-stats.py) contributions made within within an organization.
+A script called [gitlab-stats.py](gitlab-stats.py) counts contributions made within within an organization.
 
 To be able to query the GitLab API, create a new [Personal Access Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html).
 
@@ -125,7 +125,7 @@ export GITLAB_API_TOKEN='<API_KEY>'
 Execute the script:
 
 ```
-$ ./gitlab-stats.py
+$ ./gitlab-stats.py -r
 
 === Statistics for GitLab Group 'redhat-cop' ====
 
