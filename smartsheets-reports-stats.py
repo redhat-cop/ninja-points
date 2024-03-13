@@ -52,7 +52,7 @@ if not api_token:
 today_date = datetime.now()
 
 headers = {}
-resp = requests.get("https://api.smartsheet.com/2.0/reports/{0}?level=2&pageSize=300&include=objectValue".format(sheet_id), headers={"Authorization":"Bearer {0}".format(api_token)})
+resp = requests.get("https://api.smartsheet.com/2.0/reports/{0}?level=2&pageSize=400&include=objectValue".format(sheet_id), headers={"Authorization":"Bearer {0}".format(api_token)})
 sheet = json.loads(resp.text)
 
 column_map={}
