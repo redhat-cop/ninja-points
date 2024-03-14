@@ -66,7 +66,7 @@ def get_reviews(session, url):
 
 def get_org_search_issues(session, start_date, github_org):
 
-    query = "https://api.github.com/search/issues?q=user:{}+updated:>={}+archived:false+state:closed&per_page=50".format(github_org, start_date.date().isoformat())
+    query = "https://api.github.com/search/issues?q=user:{}+updated:>={}+archived:false+state:closed&per_page=200".format(github_org, start_date.date().isoformat())
     return handle_pagination_items(session, query)
 
 def process_labels(labels):
